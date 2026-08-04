@@ -1,0 +1,17 @@
+{
+  "name": "secure-healthcare-blockchain-framework",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Secure distributed healthcare blockchain framework with a professional, multi-page website.",
+  "scripts": {
+    "install-all": "npm install --prefix server && npm install --prefix client",
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "start": "npm run start --prefix server",
+    "build": "npm run build --prefix client",
+    "docker-build": "docker build -t healthcare-blockchain .",
+    "docker-up": "docker-compose up --build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.1"
+  }
+}

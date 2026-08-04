@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - '4000:4000'
+    env_file:
+      - .env
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+      - ENCRYPTION_KEY=YourStrongHealthcareEncryptionKey2026
+      - JWT_SECRET=YourJwtSecret2026
