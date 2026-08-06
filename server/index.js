@@ -4,6 +4,37 @@ const express = require('express');
 const cors = require('cors');
 const { Blockchain, PatientRecordTransaction } = require('./blockchain');
 const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser } = require('./auth');
+const { getUserByPatientId } = require('./auth');
+const { sendSMS } = require('./notifications');
+const multer = require('multer');
+const fs = require('fs');
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+});
+const upload = multer({ storage });
+
+// initialize sqlite DB for file metadata
+const { init: initDb, saveFileMeta, getFileMeta, listFilesForPatient } = require('./db');
+const db = initDb();
+
+// migrate old metadata.json into sqlite (if present)
+const metadataFile = path.join(__dirname, 'uploads', 'metadata.json');
+if (fs.existsSync(metadataFile)) {
+  try {
+    const raw = fs.readFileSync(metadataFile, 'utf8');
+    const map = JSON.parse(raw || '{}');
+    for (const [filename, meta] of Object.entries(map)) {
+      saveFileMeta(db, meta).catch(err => console.error('migrate save failed', err));
+    }
+    // remove metadata file after migration
+    try { fs.unlinkSync(metadataFile); } catch (e) {}
+  } catch (err) {
+    console.error('Migration failed:', err.message || err);
+  }
+}
 const { ContractEngine } = require('./contracts');
 
 const app = express();
@@ -85,10 +116,116 @@ app.post('/api/records', authenticateToken, authorizeRoles('Doctor', 'Nurse', 'A
 
   try {
     const transaction = ledger.addTransaction({ patientId, author, data });
+    // Notify patient by phone if available
+    const patientUser = getUserByPatientId(patientId);
+    if (patientUser && patientUser.phone) {
+      const message = `New medical record uploaded for you by ${author}. Log in to HealthLedger to view it.`;
+      sendSMS(patientUser.phone, message).catch(() => {});
+    }
     res.json({ message: 'Record added to pending ledger pool.', transaction });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Upload file endpoint for hospital staff. Stores file and creates a ledger transaction with file metadata.
+app.post('/api/files/upload', authenticateToken, authorizeRoles('Doctor', 'Nurse', 'Admin'), upload.single('file'), (req, res) => {
+  const { patientId, author } = req.body;
+  if (!patientId || !author) {
+    // cleanup uploaded file
+    if (req.file && req.file.path) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: 'patientId and author are required.' });
+  }
+
+  if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+
+  const meta = {
+    patientId,
+    originalname: req.file.originalname,
+    filename: req.file.filename,
+    path: req.file.path,
+    mimetype: req.file.mimetype,
+    size: req.file.size,
+    timestamp: new Date().toISOString()
+  };
+
+  // persist metadata to sqlite
+  saveFileMeta(db, meta).catch(err => console.error('saveFileMeta error', err));
+
+  // add to ledger as a transaction (encrypted file metadata)
+  ledger.addTransaction({ patientId, author, data: { file: { originalname: meta.originalname, filename: meta.filename, mimetype: meta.mimetype, size: meta.size } } });
+
+  // generate signed download URL valid for configured expiry
+  const jwt = require('jsonwebtoken');
+  const downloadSecret = process.env.DOWNLOAD_SECRET || process.env.JWT_SECRET;
+  const expirySeconds = parseInt(process.env.DOWNLOAD_URL_EXPIRY || '86400', 10); // default 24h
+  const token = jwt.sign({ filename: meta.filename }, downloadSecret, { expiresIn: expirySeconds });
+  const signedLink = `${req.protocol}://${req.get('host')}/api/files/${encodeURIComponent(meta.filename)}?token=${token}`;
+
+  // notify patient
+  const patientUser = getUserByPatientId(patientId);
+  if (patientUser && patientUser.phone) {
+    const message = `A new report has been uploaded for you. View it here: ${signedLink}`;
+    sendSMS(patientUser.phone, message).catch(() => {});
+  }
+
+  res.status(201).json({ message: 'File uploaded and recorded in ledger.', file: meta, signedLink });
+});
+
+// Serve uploaded files with access control: only hospital staff or the owning patient can fetch the file
+app.get('/api/files/:filename', async (req, res) => {
+  const filename = req.params.filename;
+  const qtoken = req.query.token;
+
+  // try query token first (signed URL)
+  const jwtLib = require('jsonwebtoken');
+  const downloadSecret = process.env.DOWNLOAD_SECRET || process.env.JWT_SECRET;
+  let allowed = false;
+
+  if (qtoken) {
+    try {
+      const payload = jwtLib.verify(qtoken, downloadSecret);
+      if (payload && payload.filename === filename) allowed = true;
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired download token.' });
+    }
+  }
+
+  // if not allowed via token, try regular auth
+  let meta;
+  try {
+    meta = await getFileMeta(db, filename);
+  } catch (err) {
+    console.error('getFileMeta error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+
+  if (!meta) return res.status(404).json({ error: 'File not found.' });
+
+  if (!allowed) {
+    // check Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Authentication required.' });
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Authentication required.' });
+    try {
+      const payload = jwtLib.verify(token, process.env.JWT_SECRET || 'HealthcareJwtSecret2026!');
+      const user = payload;
+      const hospitalRoles = ['Doctor', 'Nurse', 'Admin'];
+      if (hospitalRoles.includes(user.role) || (user.role === 'Patient' && user.patientId === meta.patientId)) {
+        allowed = true;
+      } else {
+        return res.status(403).json({ error: 'Not authorized to access this file.' });
+      }
+    } catch (err) {
+      return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+  }
+
+  if (allowed) {
+    return res.sendFile(path.resolve(meta.path));
+  }
+  return res.status(403).json({ error: 'Not authorized to access this file.' });
 });
 
 app.post('/api/mine', authenticateToken, authorizeRoles('Admin'), (req, res) => {
@@ -121,6 +258,25 @@ app.post('/api/contracts', authenticateToken, authorizeRoles('Admin'), (req, res
   );
 
   res.json({ message: 'Contract deployed successfully.', contract });
+});
+
+// List files for a patient. Doctors and staff can specify patientId; patients see own files.
+app.get('/api/files', authenticateToken, (req, res) => {
+  const requestedPatientId = req.query.patientId || req.user.patientId;
+  if (!requestedPatientId) return res.status(400).json({ error: 'Missing patientId' });
+
+  if (req.user.role === 'Patient' && requestedPatientId !== req.user.patientId) {
+    return res.status(403).json({ error: 'Patients may only access their own files.' });
+  }
+
+  listFilesForPatient(db, requestedPatientId).then(rows => {
+    // mask internal path before sending
+    const masked = rows.map(r => ({ filename: r.filename, originalname: r.originalname, mimetype: r.mimetype, size: r.size, timestamp: r.timestamp, patientId: r.patientId }));
+    res.json({ patientId: requestedPatientId, files: masked });
+  }).catch(err => {
+    console.error('listFilesForPatient error', err);
+    res.status(500).json({ error: 'Server error' });
+  });
 });
 
 app.post('/api/reset-ledger', authenticateToken, authorizeRoles('Admin'), (req, res) => {

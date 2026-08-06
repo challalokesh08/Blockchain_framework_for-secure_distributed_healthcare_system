@@ -6,6 +6,7 @@ function Records() {
   const { user } = useContext(AuthContext);
   const [patientId, setPatientId] = useState(user?.role === 'Patient' ? user?.patientId || 'P-1001' : 'P-1001');
   const [records, setRecords] = useState([]);
+  const [files, setFiles] = useState([]);
   const [form, setForm] = useState({ patientId: '', author: '', diagnosis: '', notes: '' });
   const [message, setMessage] = useState('');
 
@@ -14,6 +15,8 @@ function Records() {
     axios.get('/api/records', { params })
       .then(response => setRecords(response.data.records))
       .catch(() => setRecords([]));
+    // fetch files list
+    axios.get('/api/files', { params }).then(r => setFiles(r.data.files || [])).catch(() => setFiles([]));
   }, [patientId, user]);
 
   const submitRecord = async (event) => {
@@ -101,6 +104,21 @@ function Records() {
               </article>
             ))
           )}
+          <div style={{ marginTop: '1.5rem' }}>
+            <h4>Files</h4>
+            {files.length === 0 ? <p>No files uploaded for this patient.</p> : (
+              files.map((f) => (
+                <article key={f.filename} className="history-card">
+                  <div className="history-card-meta">
+                    <span><strong>{f.originalname}</strong></span>
+                    <span>{new Date(f.timestamp).toLocaleString()}</span>
+                  </div>
+                  <p>Size: {f.size} bytes • Type: {f.mimetype}</p>
+                  <p><a className="button secondary" href={`/api/files/${encodeURIComponent(f.filename)}`} target="_blank" rel="noreferrer">Download</a></p>
+                </article>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </section>

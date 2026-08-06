@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
+import UploadForm from './components/UploadForm.jsx';
+import Notifications from './components/Notifications.jsx';
 import Home from './pages/Home.jsx';
 import Features from './pages/Features.jsx';
 import Explorer from './pages/Explorer.jsx';
@@ -26,6 +28,8 @@ function App() {
               <Route path="/features" element={<Features />} />
               <Route path="/explorer" element={<Explorer />} />
               <Route path="/records" element={<ProtectedRoute><Records /></ProtectedRoute>} />
+              <Route path="/upload" element={<ProtectedRoute><UploadForm /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
               <Route path="/contracts" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
               <Route path="/about" element={<About />} />
               <Route path="/login" element={<Login />} />

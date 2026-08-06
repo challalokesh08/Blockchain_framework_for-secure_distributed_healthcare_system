@@ -41,6 +41,9 @@ function Navbar() {
               {link.label}
             </NavLink>
           ))}
+            {user && (user.role === 'Doctor' || user.role === 'Nurse' || user.role === 'Admin') && (
+              <NavLink to="/upload" className="nav-link">Upload</NavLink>
+            )}
           {isAuthenticated ? (
             <>
               <AuthStatus />

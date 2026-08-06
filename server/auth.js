@@ -18,6 +18,10 @@ function findUserByPhone(phone) {
   return users.find(user => user.phone === phone);
 }
 
+function getUserByPatientId(patientId) {
+  return users.find(user => user.patientId === patientId);
+}
+
 function verifyPassword(user, rawPassword) {
   if (!user || !user.password) {
     return false;
@@ -75,6 +79,7 @@ function authorizeRoles(...allowedRoles) {
 module.exports = {
   findUser,
   findUserByPhone,
+  getUserByPatientId,
   verifyPassword,
   generateToken,
   authenticateToken,
