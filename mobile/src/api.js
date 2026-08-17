@@ -1,9 +1,36 @@
 import axios from 'axios';
 
-const API_BASE = 'http://10.0.2.2:4000/api';
+// Centralized API base URL. Change this for production deployment.
+export const API_BASE = 'http://10.0.2.2:4000/api';
 
 export async function fetchStatus() {
   const res = await axios.get(`${API_BASE}/status`);
+  return res.data;
+}
+
+export async function login(phone, password) {
+  const res = await axios.post(`${API_BASE}/auth/login`, { phone, password });
+  return res.data;
+}
+
+export async function register(details) {
+  const res = await axios.post(`${API_BASE}/auth/register`, details);
+  return res.data;
+}
+
+export async function fetchRecords(token, patientId) {
+  const res = await axios.get(`${API_BASE}/records`, {
+    params: patientId ? { patientId } : {},
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.data;
+}
+
+export async function fetchFiles(token, patientId) {
+  const res = await axios.get(`${API_BASE}/files`, {
+    params: patientId ? { patientId } : {},
+    headers: { Authorization: `Bearer ${token}` }
+  });
   return res.data;
 }
 

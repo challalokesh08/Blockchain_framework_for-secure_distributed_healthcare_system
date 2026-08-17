@@ -1,128 +1,186 @@
 # HealthLedger: Secure Distributed Healthcare Blockchain Framework
 
-This repository contains a professional full-stack healthcare blockchain application and dynamic website.
+A professional full-stack healthcare blockchain application with encrypted patient records, a tamper-proof distributed ledger, smart contracts, and a modern responsive UI.
 
-## Project structure
+---
 
-- `server/` — Node.js + Express backend with a blockchain ledger, encrypted patient records, and ledger validation API.
-- `client/` — React + Vite frontend with multi-page navigation, professional healthcare UI, ledger explorer, and record management.
+## Live Demo
 
-## Key features
+| Link | URL |
+|------|-----|
+| Website (GitHub Pages) | [https://challalokesh08.github.io/Blockchain_framework_for-secure_distributed_healthcare_system/](https://challalokesh08.github.io/Blockchain_framework_for-secure_distributed_healthcare_system/) |
+| Mobile App | Install via Expo — see [Mobile App Setup](#mobile-app-setup) below |
+| API Backend | Run locally — see [Quick Start](#quick-start) below |
 
-- Encrypted healthcare record storage with AES encryption.
-- Tamper-proof blockchain ledger with proof-of-integrity validation.
-- Multi-page professional website with Home, Features, Explorer, Records, and About pages.
-- Audit-ready patient record history and block explorer.
-- Modern responsive UI designed for healthcare administration.
+> **Note:** The website above is a static build. For full functionality (login, records, mining, contracts), run the backend locally or deploy it to a platform like [Render](https://render.com), [Railway](https://railway.app), or [Vercel](https://vercel.com).
 
-## Quick start
+---
 
-Install dependencies for both server and client:
+## Quick Start (Run as Demo)
+
+### Option 1: Run Everything Locally
 
 ```bash
+# Clone the repo
+git clone https://github.com/challalokesh08/Blockchain_framework_for-secure_distributed_healthcare_system.git
+cd Blockchain_framework_for-secure_distributed_healthcare_system
+
+# Install all dependencies
 npm install
 npm run install-all
-```
 
-Start the development environment:
-
-```bash
+# Start both server and client
 npm run dev
 ```
 
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:4000/api`
 
-## Build and deploy
+### Option 2: Deploy Frontend to GitHub Pages
 
-Build the client application:
+1. Fork this repository
+2. Go to **Settings > Pages** in your fork
+3. Set **Source** to **GitHub Actions**
+4. Push to `main` — the workflow auto-deploys the frontend
+
+### Option 3: Deploy Backend (Free Hosting)
+
+Deploy `server/` to one of these platforms:
+
+| Platform | Steps |
+|----------|-------|
+| **Render** | New Web Service > Connect repo > Root directory: `server` > Start command: `node index.js` > Add env vars |
+| **Railway** | New Project > Deploy from GitHub > Set root to `server/` > Add env vars |
+| **Vercel** | Import repo > Framework preset: Other > Root: `server/` |
+
+**Required environment variables for backend:**
+
+```
+PORT=4000
+ENCRYPTION_KEY=YourStrongHealthcareEncryptionKey2026
+JWT_SECRET=YourJwtSecret2026
+```
+
+---
+
+## Demo Credentials
+
+| Role    | Phone Number | Password   |
+|---------|-------------|------------|
+| Doctor  | +15550000001 | doctorpass |
+| Nurse   | +15550000002 | nursepass  |
+| Admin   | +15550000003 | adminpass  |
+| Patient | +15550000004 | patientpass |
+
+---
+
+## Mobile App Setup
+
+The `mobile/` directory contains an Expo React Native app.
 
 ```bash
+cd mobile
+npm install
+npx expo start
+```
+
+- Scan the QR code with Expo Go (iOS/Android)
+- The app connects to `http://10.0.2.2:4000` by default (Android emulator)
+- For physical device, update `mobile/src/api.js` with your machine's local IP
+
+---
+
+## Project Structure
+
+```
+Blockchain_framework_for-secure_distributed_healthcare_system/
+├── server/                 # Node.js + Express backend
+│   ├── index.js            # API routes, file upload, mining
+│   ├── blockchain.js       # Blockchain, Block, AES encryption
+│   ├── auth.js             # JWT auth, role-based access control
+│   ├── contracts.js        # Smart contract engine
+│   ├── db.js               # SQLite for file metadata
+│   ├── notifications.js    # Twilio SMS + file fallback
+│   └── .env                # Environment config (not committed)
+├── client/                 # React + Vite frontend
+│   ├── src/
+│   │   ├── pages/          # Home, Features, Explorer, Records, Dashboard, Contracts, Login, Register, About
+│   │   ├── components/     # Navbar, Footer, UploadForm, ProtectedRoute, AuthStatus, Notifications
+│   │   └── AuthContext.jsx # Auth state management
+│   └── dist/               # Production build (auto-deployed to GitHub Pages)
+├── mobile/                 # Expo React Native mobile app
+│   └── src/screens/        # HomeScreen, LoginScreen, RegisterScreen, RecordsScreen, UploadScreen
+└── .github/workflows/      # GitHub Actions CI/CD
+```
+
+---
+
+## Key Features
+
+- **Encrypted Records** — AES encryption for all patient data before blockchain storage
+- **Tamper-Proof Ledger** — SHA-256 hash chain with proof-of-work validation
+- **Smart Contracts** — Healthcare data access agreements with approval/finalization workflows
+- **Role-Based Access** — Doctor, Nurse, Admin, and Patient roles with JWT authentication
+- **File Upload** — Signed download URLs for secure file sharing
+- **SMS Notifications** — Twilio integration with local file fallback
+- **PWA Support** — Installable web app with service worker caching
+- **Mobile App** — React Native/Expo app with same API integration
+- **Block Explorer** — Visual inspection of the blockchain ledger
+- **Audit Trail** — Complete history of all record changes and contract actions
+
+---
+
+## Build & Deploy
+
+```bash
+# Build client for production
 npm run build
-```
 
-Start the server in production mode:
-
-```bash
+# Start server in production mode
 npm start
-```
 
-## Deployment
-
-### Docker
-
-Build the Docker image:
-
-```bash
+# Docker deployment
 npm run docker-build
-```
-
-Start the app with Docker Compose:
-
-```bash
 npm run docker-up
 ```
 
-The app will listen on `http://localhost:4000` and serve the built React site from the Node.js backend.
+---
 
-## Demo credentials
+## API Endpoints
 
-- doctor1 / doctorpass  (Doctor)
-- nurse1 / nursepass    (Nurse)
-- admin1 / adminpass    (Admin)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/api/auth/login` | No | Login with phone + password |
+| POST | `/api/auth/register` | No | Register new patient |
+| GET | `/api/status` | No | Blockchain status |
+| GET | `/api/ledger` | Yes | Full blockchain ledger |
+| GET | `/api/records?patientId=P-1001` | Yes | Patient records |
+| POST | `/api/records` | Doctor/Nurse/Admin | Add record transaction |
+| POST | `/api/files/upload` | Doctor/Nurse/Admin | Upload file + notify patient |
+| GET | `/api/files/:filename` | Yes / Signed URL | Download file |
+| POST | `/api/mine` | Admin | Mine pending transactions |
+| GET | `/api/validate` | Yes | Validate chain integrity |
+| GET | `/api/contracts` | Yes | List smart contracts |
+| POST | `/api/contracts` | Admin | Create contract |
+| POST | `/api/contracts/:id/execute` | Doctor/Admin | Execute contract action |
+| POST | `/api/reset-ledger` | Admin | Reset blockchain |
 
-## Notes
-
-- The backend uses a simplified blockchain model for demonstration and can be extended into a distributed healthcare network.
-- Use the `/api/records` endpoint to submit new patient transactions and `/api/mine` to add them to the ledger.
-- Smart contracts are available on the `Contracts` page and support approval / finalization workflows.
-- Customize `ENCRYPTION_KEY` and `JWT_SECRET` in `.env` for secure deployment.
+---
 
 ## SMS Notifications (Twilio)
 
-The server can send SMS notifications to patients when their records or files are uploaded. To enable Twilio set these environment variables (for example in `server/.env`):
+Set these in `server/.env` to enable SMS:
 
-- `TWILIO_SID` — Your Twilio Account SID
-- `TWILIO_TOKEN` — Your Twilio Auth Token
-- `TWILIO_FROM` — Your Twilio phone number (the sender)
+```
+TWILIO_SID=your_account_sid
+TWILIO_TOKEN=your_auth_token
+TWILIO_FROM=+1XXXXXXXXXX
+```
 
-If these variables are not set the server writes notification messages to `server/notifications/` for development.
+Without Twilio, notifications are saved to `server/notifications/`.
 
-## File metadata persistence
+---
 
-Uploaded file metadata is stored in `server/uploads/metadata.json` so uploaded file records persist across restarts. For production use consider storing metadata in a database and protecting files in a private object store (S3).
+## License
 
-### SQLite persistence
-
-The application now persists uploaded file metadata in a lightweight SQLite database at `server/data.db`.
-
-### Signed download URLs
-
-When a hospital uploads a file the server generates a signed, expiring download URL and sends it to the patient. Configure the following optional environment variables:
-
-- `DOWNLOAD_SECRET` — secret used to sign download tokens (defaults to `JWT_SECRET`).
-- `DOWNLOAD_URL_EXPIRY` — token lifetime in seconds (default `86400`, i.e., 24h).
-
-Signed URLs look like: `https://yourhost/api/files/<filename>?token=<signed-token>` and are accepted even without an Authorization header.
-
-## PWA / Mobile App
-
-I added Progressive Web App support so the site can be installed on mobile and desktop as an app:
-
-- `client/public/manifest.webmanifest` — app manifest
-- `client/public/service-worker.js` — simple service worker caching core assets
-- `client/public/icon.svg` — app icon
-- `client/src/registerServiceWorker.js` and registration in `client/src/main.jsx`
-
-This makes the web app installable and gives a native-like experience. For native mobile apps (iOS/Android) I recommend using React Native with shared API endpoints; I can scaffold an Expo project that reuses the existing APIs.
-
-Suggested app names:
-
-- HealthLedger (default)
-- MedChain
-- CareLedger
-- PatientVault
-- LedgerCare
-
-Tell me which app name you prefer and whether you want a native app scaffold (React Native/Expo) or just PWA-only. If you want native apps, I can scaffold an Expo project next.
-
+This project is for educational and demonstration purposes.

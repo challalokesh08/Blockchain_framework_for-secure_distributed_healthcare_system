@@ -1,46 +1,60 @@
 import React, { createContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE } from './api';
 import axios from 'axios';
 
 export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = global.localStorage?.getItem?.('token') || null;
-    const storedUser = global.localStorage?.getItem?.('user') || null;
-    if (token && storedUser) {
-      axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-      setUser(JSON.parse(storedUser));
-    }
+    AsyncStorage.getItem('token').then(storedToken => {
+      AsyncStorage.getItem('user').then(storedUser => {
+        if (storedToken && storedUser) {
+          axios.defaults.headers.common.Authorization = `Bearer ${storedToken}`;
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        }
+        setLoading(false);
+      });
+    }).catch(() => setLoading(false));
   }, []);
 
-  const login = async (phone, password) => {
-    const response = await axios.post('http://10.0.2.2:4000/api/auth/login', { phone, password });
-    const { token, user: userData } = response.data;
-    axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-    try { global.localStorage.setItem('token', token); global.localStorage.setItem('user', JSON.stringify(userData)); } catch (e) {}
+  const loginUser = async (phone, password) => {
+    const response = await axios.post(`${API_BASE}/auth/login`, { phone, password });
+    const { token: newToken, user: userData } = response.data;
+    axios.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+    await AsyncStorage.setItem('token', newToken);
+    await AsyncStorage.setItem('user', JSON.stringify(userData));
+    setToken(newToken);
     setUser(userData);
     return userData;
   };
 
-  const register = async (details) => {
-    const response = await axios.post('http://10.0.2.2:4000/api/auth/register', details);
-    const { token, user: userData } = response.data;
-    axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-    try { global.localStorage.setItem('token', token); global.localStorage.setItem('user', JSON.stringify(userData)); } catch (e) {}
+  const registerUser = async (details) => {
+    const response = await axios.post(`${API_BASE}/auth/register`, details);
+    const { token: newToken, user: userData } = response.data;
+    axios.defaults.headers.common.Authorization = `Bearer ${newToken}`;
+    await AsyncStorage.setItem('token', newToken);
+    await AsyncStorage.setItem('user', JSON.stringify(userData));
+    setToken(newToken);
     setUser(userData);
     return userData;
   };
 
-  const logout = () => {
-    try { global.localStorage.removeItem('token'); global.localStorage.removeItem('user'); } catch (e) {}
+  const logout = async () => {
+    await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('user');
     delete axios.defaults.headers.common.Authorization;
+    setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, token, login: loginUser, register: registerUser, logout, isAuthenticated: !!user, loading }}>
       {children}
     </AuthContext.Provider>
   );
