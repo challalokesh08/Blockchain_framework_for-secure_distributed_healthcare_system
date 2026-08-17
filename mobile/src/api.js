@@ -1,7 +1,14 @@
 import axios from 'axios';
 
-// Centralized API base URL. Change this for production deployment.
-export const API_BASE = 'http://10.0.2.2:4000/api';
+// ========================================
+// API BASE URL — change this for deployment
+// ========================================
+// Local (same WiFi):    http://YOUR_LAPTOP_IP:4000/api
+// ngrok tunnel:         https://YOUR_NGROK_URL/api
+// Render cloud:         https://your-app.onrender.com/api
+// Emulator:             http://10.0.2.2:4000/api
+// ========================================
+export const API_BASE = 'http://172.29.134.223:4000/api';
 
 export async function fetchStatus() {
   const res = await axios.get(`${API_BASE}/status`);
