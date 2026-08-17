@@ -8,7 +8,7 @@ import axios from 'axios';
 // Render cloud:         https://your-app.onrender.com/api
 // Emulator:             http://10.0.2.2:4000/api
 // ========================================
-export const API_BASE = 'http://172.29.134.223:4000/api';
+export const API_BASE = 'https://healthledger-api.onrender.com/api';
 
 export async function fetchStatus() {
   const res = await axios.get(`${API_BASE}/status`);
