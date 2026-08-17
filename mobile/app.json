@@ -3,9 +3,16 @@
     "name": "HealthLedger",
     "slug": "healthledger-mobile",
     "version": "1.0.0",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "orientation": "portrait",
-    "sdkVersion": "51.0.0",
-    "jsEngine": "hermes"
+    "sdkVersion": "54.0.0",
+    "jsEngine": "hermes",
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }
