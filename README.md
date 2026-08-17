@@ -38,10 +38,12 @@ npm run dev
 
 ### Option 2: Deploy Frontend to GitHub Pages
 
-1. Fork this repository
-2. Go to **Settings > Pages** in your fork
-3. Set **Source** to **GitHub Actions**
-4. Push to `main` — the workflow auto-deploys the frontend
+1. Go to **Settings > Pages** in your repo
+2. Set **Source** to **Deploy from a branch**
+3. Select branch **main** and folder **/docs**
+4. Save — the site auto-deploys on every push to main
+
+> The built frontend is in the `docs/` folder and is committed to the repo. GitHub Pages serves it directly.
 
 ### Option 3: Deploy Backend (Free Hosting)
 
