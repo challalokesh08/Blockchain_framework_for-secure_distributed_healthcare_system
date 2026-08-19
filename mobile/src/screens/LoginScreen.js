@@ -16,6 +16,7 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     try {
       await login(phone.trim(), password);
+      navigation.popToTop();
     } catch (err) {
       Alert.alert('Login Failed', err.response?.data?.error || 'Check credentials.');
     } finally {

@@ -18,6 +18,7 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     try {
       await register({ name: name.trim(), age: age.trim(), phone: phone.trim(), password });
+      navigation.popToTop();
     } catch (err) {
       Alert.alert('Failed', err.response?.data?.error || 'Try again.');
     } finally {
@@ -34,7 +35,7 @@ export default function RegisterScreen({ navigation }) {
       <TextInput style={s.input} placeholder="Phone (+15550000004)" placeholderTextColor="#666" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoCapitalize="none" />
       <TextInput style={s.input} placeholder="Password" placeholderTextColor="#666" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" />
       {loading ? <ActivityIndicator size="small" color="#58d9a6" style={{ marginVertical: 12 }} /> : <Button title="Register" color="#58d9a6" onPress={onSubmit} />}
-      <View style={{ marginTop: 16 }}><Button title="Back to Login" color="#5b8ff9" onPress={() => navigation.navigate('Login')} /></View>
+      <View style={{ marginTop: 16 }}><Button title="Back to Login" color="#5b8ff9" onPress={() => navigation.goBack()} /></View>
     </View>
   );
 }
