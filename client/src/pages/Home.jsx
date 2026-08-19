@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 function Home() {
@@ -19,8 +20,8 @@ function Home() {
             <h2>Secure patient records on a tamper-proof distributed ledger</h2>
             <p>HealthLedger supports doctors, hospital staff, and patients with trusted data access, encrypted medical workflows, and audit-ready infrastructure.</p>
             <div className="hero-actions">
-              <a className="button primary" href="/features">Discover Features</a>
-              <a className="button secondary" href="/login">Sign In</a>
+              <Link className="button primary" to="/features">Discover Features</Link>
+              <Link className="button secondary" to="/login">Sign In</Link>
             </div>
           </div>
           <div className="hero-panel">
