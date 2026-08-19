@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext } from 'react';
-import axios from 'axios';
+import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
 export default function Notifications() {
@@ -9,13 +9,12 @@ export default function Notifications() {
   useEffect(() => {
     if (!user) return;
     const pid = user.patientId || '';
-    // poll for new records and files
     let mounted = true;
     async function fetchNotifications() {
       try {
-        const res = await axios.get(`/api/records?patientId=${pid}`);
+        const res = await api.get('/api/records', { params: { patientId: pid } });
         const records = res.data.records || [];
-        const filesRes = await axios.get(`/api/files?patientId=${pid}`);
+        const filesRes = await api.get('/api/files', { params: { patientId: pid } });
         const files = filesRes.data.files || [];
         if (mounted) setNotifications([...records.map(r=>({type:'record',data:r})), ...files.map(f=>({type:'file',data:f}))]);
       } catch (err) {
@@ -23,7 +22,7 @@ export default function Notifications() {
       }
     }
     fetchNotifications();
-    const id = setInterval(fetchNotifications, 15000);
+    const id = setInterval(fetchNotifications, 30000);
     return () => { mounted = false; clearInterval(id); };
   }, [user]);
 
@@ -37,9 +36,9 @@ export default function Notifications() {
           {notifications.map((n, idx) => (
             <li key={idx} className="notification-item">
               {n.type === 'record' ? (
-                <div><strong>Record:</strong> {n.data.data?.summary || JSON.stringify(n.data.data)}</div>
+                <div><strong>Record:</strong> {n.data.data?.diagnosis || n.data.data?.summary || 'New record'}</div>
               ) : (
-                <div><strong>File:</strong> <a href={`/api/files/${encodeURIComponent(n.data.filename)}`} target="_blank" rel="noreferrer">{n.data.originalname}</a></div>
+                <div><strong>File:</strong> <a href={`https://healthledger-api.onrender.com/api/files/${encodeURIComponent(n.data.filename)}`} target="_blank" rel="noreferrer">{n.data.originalname}</a></div>
               )}
             </li>
           ))}

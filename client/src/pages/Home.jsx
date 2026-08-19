@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api.js';
 
 function Home() {
   const [status, setStatus] = useState(null);
 
   useEffect(() => {
-    axios.get('/api/status')
+    api.get('/api/status')
       .then(response => setStatus(response.data))
       .catch(() => setStatus(null));
   }, []);

@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
 function Records() {
@@ -12,11 +12,10 @@ function Records() {
 
   useEffect(() => {
     const params = user?.role === 'Patient' ? {} : { patientId };
-    axios.get('/api/records', { params })
+    api.get('/api/records', { params })
       .then(response => setRecords(response.data.records))
       .catch(() => setRecords([]));
-    // fetch files list
-    axios.get('/api/files', { params }).then(r => setFiles(r.data.files || [])).catch(() => setFiles([]));
+    api.get('/api/files', { params }).then(r => setFiles(r.data.files || [])).catch(() => setFiles([]));
   }, [patientId, user]);
 
   const submitRecord = async (event) => {
@@ -24,14 +23,11 @@ function Records() {
     const payload = {
       patientId: form.patientId || patientId,
       author: form.author,
-      data: {
-        diagnosis: form.diagnosis,
-        notes: form.notes
-      }
+      data: { diagnosis: form.diagnosis, notes: form.notes }
     };
 
     try {
-      const response = await axios.post('/api/records', payload);
+      const response = await api.post('/api/records', payload);
       setMessage(response.data.message);
       setForm({ patientId: '', author: '', diagnosis: '', notes: '' });
     } catch (error) {
@@ -98,8 +94,8 @@ function Records() {
                   <span><strong>{record.author}</strong></span>
                   <span>{new Date(record.timestamp).toLocaleString()}</span>
                 </div>
-                <p><strong>Diagnosis:</strong> {record.data.diagnosis}</p>
-                <p><strong>Notes:</strong> {record.data.notes}</p>
+                <p><strong>Diagnosis:</strong> {record.data?.diagnosis || 'N/A'}</p>
+                <p><strong>Notes:</strong> {record.data?.notes || 'N/A'}</p>
                 <p className="history-card-hash">Block Hash: {record.hash}</p>
               </article>
             ))
@@ -113,8 +109,8 @@ function Records() {
                     <span><strong>{f.originalname}</strong></span>
                     <span>{new Date(f.timestamp).toLocaleString()}</span>
                   </div>
-                  <p>Size: {f.size} bytes • Type: {f.mimetype}</p>
-                  <p><a className="button secondary" href={`/api/files/${encodeURIComponent(f.filename)}`} target="_blank" rel="noreferrer">Download</a></p>
+                  <p>Size: {f.size} bytes | Type: {f.mimetype}</p>
+                  <p><a className="button secondary" href={`https://healthledger-api.onrender.com/api/files/${encodeURIComponent(f.filename)}`} target="_blank" rel="noreferrer">Download</a></p>
                 </article>
               ))
             )}

@@ -1,5 +1,5 @@
 import { useState, useContext } from 'react';
-import axios from 'axios';
+import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
 export default function UploadForm() {
@@ -19,7 +19,7 @@ export default function UploadForm() {
       fd.append('patientId', patientId);
       fd.append('author', user?.name || 'Staff');
       fd.append('file', file);
-      const res = await axios.post('/api/files/upload', fd, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } });
+      await api.post('/api/files/upload', fd, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } });
       setStatus('Upload successful — patient notified.');
     } catch (err) {
       setStatus(err.response?.data?.error || 'Upload failed');

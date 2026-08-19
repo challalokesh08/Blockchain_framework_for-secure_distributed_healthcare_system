@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
 function Contracts() {
@@ -9,7 +9,7 @@ function Contracts() {
   const [message, setMessage] = useState('');
 
   const loadContracts = async () => {
-    const response = await axios.get('/api/contracts');
+    const response = await api.get('/api/contracts');
     setContracts(response.data.contracts);
   };
 
@@ -22,7 +22,7 @@ function Contracts() {
     setMessage('');
 
     try {
-      await axios.post('/api/contracts', {
+      await api.post('/api/contracts', {
         contractType: 'DataAccessAgreement',
         patientId: form.patientId,
         authorizedProvider: form.authorizedProvider,
@@ -39,7 +39,7 @@ function Contracts() {
   const handleAction = async (contractId, action) => {
     setMessage('');
     try {
-      await axios.post(`/api/contracts/${contractId}/execute`, { action, comment: `${action} requested by ${user.name}` });
+      await api.post(`/api/contracts/${contractId}/execute`, { action, comment: `${action} requested by ${user?.name}` });
       setMessage('Contract action applied successfully.');
       loadContracts();
     } catch (err) {
@@ -56,7 +56,7 @@ function Contracts() {
             <h2>Healthcare workflow contract engine</h2>
             <p>Create, approve, and finalize smart healthcare access agreements with role-aware contract actions.</p>
           </div>
-          {user.role === 'Admin' ? (
+          {user?.role === 'Admin' ? (
             <form className="contract-form" onSubmit={handleCreate}>
               <label>
                 Patient ID
@@ -94,23 +94,23 @@ function Contracts() {
                   <span>{contract.status}</span>
                 </div>
                 <p><strong>Contract ID:</strong> {contract.contractId}</p>
-                <p><strong>Patient:</strong> {contract.details.patientId}</p>
-                <p><strong>Authorized provider:</strong> {contract.details.authorizedProvider}</p>
-                <p><strong>Purpose:</strong> {contract.details.purpose}</p>
+                <p><strong>Patient:</strong> {contract.details?.patientId}</p>
+                <p><strong>Authorized provider:</strong> {contract.details?.authorizedProvider}</p>
+                <p><strong>Purpose:</strong> {contract.details?.purpose}</p>
                 <div className="contract-actions">
-                  {(contract.status === 'PENDING' && ['Doctor', 'Admin'].includes(user.role)) && (
+                  {(contract.status === 'PENDING' && ['Doctor', 'Admin'].includes(user?.role)) && (
                     <button className="button secondary" onClick={() => handleAction(contract.contractId, 'approveAccess')}>Approve Access</button>
                   )}
-                  {(contract.status !== 'COMPLETED' && user.role === 'Admin') && (
+                  {(contract.status !== 'COMPLETED' && user?.role === 'Admin') && (
                     <button className="button secondary" onClick={() => handleAction(contract.contractId, 'finalize')}>Finalize Contract</button>
                   )}
                 </div>
-                {contract.history.length > 0 && (
+                {contract.history?.length > 0 && (
                   <div className="contract-history">
                     <h5>History</h5>
                     {contract.history.map((event, index) => (
                       <p key={`${contract.contractId}-${index}`} className="contract-history-item">
-                        {event.timestamp} — {event.action} by {event.executor.name} ({event.executor.role})
+                        {event.timestamp} — {event.action} by {event.executor?.name || 'System'} ({event.executor?.role || 'System'})
                       </p>
                     ))}
                   </div>

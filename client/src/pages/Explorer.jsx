@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../api.js';
 
 function Explorer() {
   const [ledger, setLedger] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/api/ledger')
+    api.get('/api/ledger')
       .then(response => setLedger(response.data))
       .catch(() => setLedger([]))
       .finally(() => setIsLoading(false));
