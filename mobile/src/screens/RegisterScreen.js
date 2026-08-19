@@ -18,7 +18,6 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     try {
       await register({ name: name.trim(), age: age.trim(), phone: phone.trim(), password });
-      navigation.navigate('Records');
     } catch (err) {
       Alert.alert('Failed', err.response?.data?.error || 'Try again.');
     } finally {
