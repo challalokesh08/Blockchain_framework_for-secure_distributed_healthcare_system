@@ -13,11 +13,7 @@ const Stack = createNativeStackNavigator();
 
 function Navigator() {
   const { isAuthenticated, loading } = useContext(AuthContext);
-
-  if (loading) {
-    return <View style={s.loader}><ActivityIndicator size="large" color="#5b8ff9" /></View>;
-  }
-
+  if (loading) return <View style={s.ld}><ActivityIndicator size="large" color="#5b8ff9" /></View>;
   return (
     <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#0b1118' }, headerTintColor: '#fff', contentStyle: { backgroundColor: '#08101a' } }}>
       <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'HealthLedger' }} />
@@ -43,6 +39,4 @@ export default function App() {
   );
 }
 
-const s = StyleSheet.create({
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#08101a' },
-});
+const s = StyleSheet.create({ ld: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#08101a' } });

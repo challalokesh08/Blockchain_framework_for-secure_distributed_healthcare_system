@@ -9,11 +9,7 @@
     "ios": {
       "supportsTablet": true
     },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#08101a"
-      }
-    },
+    "android": {},
     "web": {
       "favicon": "./assets/favicon.png"
     }

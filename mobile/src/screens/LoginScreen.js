@@ -10,7 +10,7 @@ export default function LoginScreen({ navigation }) {
 
   const onSubmit = async () => {
     if (!phone.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter phone and password.');
+      Alert.alert('Error', 'Enter phone and password.');
       return;
     }
     setLoading(true);
@@ -18,7 +18,7 @@ export default function LoginScreen({ navigation }) {
       await login(phone.trim(), password);
       navigation.navigate('Records');
     } catch (err) {
-      Alert.alert('Login Failed', err.response?.data?.error || 'Check your credentials.');
+      Alert.alert('Login Failed', err.response?.data?.error || 'Check credentials.');
     } finally {
       setLoading(false);
     }
@@ -27,20 +27,11 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={s.container}>
       <Text style={s.title}>Sign In</Text>
-      <Text style={s.sub}>Enter your phone number and password</Text>
-
+      <Text style={s.sub}>Phone number and password</Text>
       <TextInput style={s.input} placeholder="Phone (+15550000004)" placeholderTextColor="#666" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoCapitalize="none" />
       <TextInput style={s.input} placeholder="Password" placeholderTextColor="#666" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" />
-
-      {loading ? (
-        <ActivityIndicator size="small" color="#5b8ff9" style={{ marginVertical: 12 }} />
-      ) : (
-        <Button title="Login" color="#5b8ff9" onPress={onSubmit} />
-      )}
-
-      <View style={{ marginTop: 16 }}>
-        <Button title="Register as Patient" color="#58d9a6" onPress={() => navigation.navigate('Register')} />
-      </View>
+      {loading ? <ActivityIndicator size="small" color="#5b8ff9" style={{ marginVertical: 12 }} /> : <Button title="Login" color="#5b8ff9" onPress={onSubmit} />}
+      <View style={{ marginTop: 16 }}><Button title="Register as Patient" color="#58d9a6" onPress={() => navigation.navigate('Register')} /></View>
     </View>
   );
 }

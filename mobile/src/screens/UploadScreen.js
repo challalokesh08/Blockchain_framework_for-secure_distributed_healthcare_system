@@ -11,25 +11,17 @@ export default function UploadScreen() {
   const [loading, setLoading] = useState(false);
 
   const pickAndUpload = async () => {
-    if (!patientId.trim()) {
-      Alert.alert('Error', 'Enter a Patient ID first.');
-      return;
-    }
-
+    if (!patientId.trim()) { Alert.alert('Error', 'Enter Patient ID.'); return; }
     const res = await DocumentPicker.getDocumentAsync({ type: '*/*' });
     if (res.canceled || !res.assets?.length) return;
-
     const file = res.assets[0];
     setLoading(true);
-    setMessage('');
     try {
       const fd = new FormData();
       fd.append('patientId', patientId.trim());
       fd.append('author', user?.name || 'Staff');
       fd.append('file', { uri: file.uri, name: file.name, type: file.mimeType || 'application/octet-stream' });
-      await api.post('/api/files/upload', fd, {
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }
-      });
+      await api.post('/api/files/upload', fd, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } });
       setMessage('Upload successful!');
       setPatientId('');
     } catch (err) {
@@ -42,17 +34,10 @@ export default function UploadScreen() {
   return (
     <View style={s.container}>
       <Text style={s.title}>Upload Report</Text>
-      <Text style={s.sub}>Upload a file for a patient record</Text>
-
+      <Text style={s.sub}>Upload a file for a patient</Text>
       <TextInput style={s.input} placeholder="Patient ID (e.g. P-1001)" placeholderTextColor="#666" value={patientId} onChangeText={setPatientId} />
-
-      {loading ? (
-        <ActivityIndicator size="small" color="#58d9a6" style={{ marginVertical: 12 }} />
-      ) : (
-        <Button title="Pick & Upload File" color="#58d9a6" onPress={pickAndUpload} />
-      )}
-
-      {message ? <Text style={[s.msg, message.includes('fail') || message.includes('Error') ? { color: '#ff6b6b' } : { color: '#58d9a6' }]}>{message}</Text> : null}
+      {loading ? <ActivityIndicator size="small" color="#58d9a6" style={{ marginVertical: 12 }} /> : <Button title="Pick & Upload File" color="#58d9a6" onPress={pickAndUpload} />}
+      {message ? <Text style={[s.msg, { color: message.includes('fail') || message.includes('Error') ? '#ff6b6b' : '#58d9a6' }]}>{message}</Text> : null}
     </View>
   );
 }

@@ -12,7 +12,7 @@ export default function RegisterScreen({ navigation }) {
 
   const onSubmit = async () => {
     if (!name.trim() || !age.trim() || !phone.trim() || !password.trim()) {
-      Alert.alert('Error', 'All fields are required.');
+      Alert.alert('Error', 'All fields required.');
       return;
     }
     setLoading(true);
@@ -20,7 +20,7 @@ export default function RegisterScreen({ navigation }) {
       await register({ name: name.trim(), age: age.trim(), phone: phone.trim(), password });
       navigation.navigate('Records');
     } catch (err) {
-      Alert.alert('Registration Failed', err.response?.data?.error || 'Try again.');
+      Alert.alert('Failed', err.response?.data?.error || 'Try again.');
     } finally {
       setLoading(false);
     }
@@ -30,21 +30,12 @@ export default function RegisterScreen({ navigation }) {
     <View style={s.container}>
       <Text style={s.title}>Register</Text>
       <Text style={s.sub}>Create your patient account</Text>
-
       <TextInput style={s.input} placeholder="Full Name" placeholderTextColor="#666" value={name} onChangeText={setName} />
       <TextInput style={s.input} placeholder="Age" placeholderTextColor="#666" value={age} onChangeText={setAge} keyboardType="numeric" />
       <TextInput style={s.input} placeholder="Phone (+15550000004)" placeholderTextColor="#666" value={phone} onChangeText={setPhone} keyboardType="phone-pad" autoCapitalize="none" />
-      <TextInput style={s.input} placeholder="Choose a password" placeholderTextColor="#666" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" />
-
-      {loading ? (
-        <ActivityIndicator size="small" color="#58d9a6" style={{ marginVertical: 12 }} />
-      ) : (
-        <Button title="Register" color="#58d9a6" onPress={onSubmit} />
-      )}
-
-      <View style={{ marginTop: 16 }}>
-        <Button title="Back to Login" color="#5b8ff9" onPress={() => navigation.navigate('Login')} />
-      </View>
+      <TextInput style={s.input} placeholder="Password" placeholderTextColor="#666" value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" />
+      {loading ? <ActivityIndicator size="small" color="#58d9a6" style={{ marginVertical: 12 }} /> : <Button title="Register" color="#58d9a6" onPress={onSubmit} />}
+      <View style={{ marginTop: 16 }}><Button title="Back to Login" color="#5b8ff9" onPress={() => navigation.navigate('Login')} /></View>
     </View>
   );
 }
