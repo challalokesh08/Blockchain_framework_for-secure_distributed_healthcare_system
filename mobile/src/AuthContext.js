@@ -1,7 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_BASE } from './api';
-import axios from 'axios';
+import api from './api';
 
 export const AuthContext = createContext(null);
 
@@ -11,36 +10,36 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem('token').then(storedToken => {
-      AsyncStorage.getItem('user').then(storedUser => {
-        if (storedToken && storedUser) {
-          axios.defaults.headers.common.Authorization = `Bearer ${storedToken}`;
-          setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+    AsyncStorage.getItem('token').then(t => {
+      AsyncStorage.getItem('user').then(u => {
+        if (t && u) {
+          api.defaults.headers.common.Authorization = `Bearer ${t}`;
+          setToken(t);
+          setUser(JSON.parse(u));
         }
         setLoading(false);
       });
     }).catch(() => setLoading(false));
   }, []);
 
-  const loginUser = async (phone, password) => {
-    const response = await axios.post(`${API_BASE}/auth/login`, { phone, password });
-    const { token: newToken, user: userData } = response.data;
-    axios.defaults.headers.common.Authorization = `Bearer ${newToken}`;
-    await AsyncStorage.setItem('token', newToken);
+  const login = async (phone, password) => {
+    const res = await api.post('/api/auth/login', { phone, password });
+    const { token: t, user: userData } = res.data;
+    api.defaults.headers.common.Authorization = `Bearer ${t}`;
+    await AsyncStorage.setItem('token', t);
     await AsyncStorage.setItem('user', JSON.stringify(userData));
-    setToken(newToken);
+    setToken(t);
     setUser(userData);
     return userData;
   };
 
-  const registerUser = async (details) => {
-    const response = await axios.post(`${API_BASE}/auth/register`, details);
-    const { token: newToken, user: userData } = response.data;
-    axios.defaults.headers.common.Authorization = `Bearer ${newToken}`;
-    await AsyncStorage.setItem('token', newToken);
+  const register = async (details) => {
+    const res = await api.post('/api/auth/register', details);
+    const { token: t, user: userData } = res.data;
+    api.defaults.headers.common.Authorization = `Bearer ${t}`;
+    await AsyncStorage.setItem('token', t);
     await AsyncStorage.setItem('user', JSON.stringify(userData));
-    setToken(newToken);
+    setToken(t);
     setUser(userData);
     return userData;
   };
@@ -48,13 +47,13 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
-    delete axios.defaults.headers.common.Authorization;
+    delete api.defaults.headers.common.Authorization;
     setToken(null);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login: loginUser, register: registerUser, logout, isAuthenticated: !!user, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, isAuthenticated: !!user, loading }}>
       {children}
     </AuthContext.Provider>
   );

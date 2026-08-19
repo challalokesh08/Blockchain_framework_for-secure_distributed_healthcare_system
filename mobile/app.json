@@ -3,16 +3,19 @@
     "name": "HealthLedger",
     "slug": "healthledger-mobile",
     "version": "1.0.0",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
     "orientation": "portrait",
-    "sdkVersion": "54.0.0",
-    "jsEngine": "hermes",
-    "plugins": [
-      "expo-secure-store"
-    ]
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#08101a"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
   }
 }
