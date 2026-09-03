@@ -42,20 +42,46 @@ const port = process.env.PORT || 4000;
 const ledger = new Blockchain();
 const contractEngine = new ContractEngine(ledger);
 
-// Seed 110 patients + medical records on startup so data persists across redeploys
+// Seed 110 patients + medical records + image files on startup so data persists across redeploys
 try {
   const dataset = require('../dataset');
+  const seedImageDir = path.join(__dirname, 'seed-images');
   let seeded = 0;
+  let seededFiles = 0;
+
   for (const p of dataset) {
     const user = seedPatient({ patientId: p.patientId, name: p.name, age: p.age, phone: p.phone });
     if (user) {
       seeded++;
       ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { diagnosis: p.diagnosis, notes: p.news, department: p.department, physician: p.doctor } });
     }
+
+    // Seed the associated medical report image file
+    const src = path.join(seedImageDir, `${p.patientId}.png`);
+    if (fs.existsSync(src)) {
+      const storedName = `seed-${p.patientId}.png`;
+      const dest = path.join(uploadDir, storedName);
+      if (!fs.existsSync(dest)) {
+        fs.copyFileSync(src, dest);
+        const st = fs.statSync(dest);
+        const meta = {
+          patientId: p.patientId,
+          originalname: `${p.name} - Medical Report.png`,
+          filename: storedName,
+          path: dest,
+          mimetype: 'image/png',
+          size: st.size,
+          timestamp: new Date().toISOString()
+        };
+        saveFileMeta(db, meta).catch(err => console.error('seed saveFileMeta error', err));
+        ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { file: { originalname: meta.originalname, filename: meta.filename, mimetype: meta.mimetype, size: meta.size } } });
+        seededFiles++;
+      }
+    }
   }
   if (seeded > 0) {
     ledger.minePendingTransactions('seed-node');
-    console.log(`Seeded ${seeded} patients and their records on startup`);
+    console.log(`Seeded ${seeded} patients, medical records, and ${seededFiles} image files on startup`);
   }
 } catch (err) {
   console.error('Seed failed (non-fatal):', err.message);
