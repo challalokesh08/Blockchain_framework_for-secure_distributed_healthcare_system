@@ -1,22 +1,42 @@
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState, useCallback } from 'react';
 import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
 function Records() {
   const { user } = useContext(AuthContext);
-  const [patientId, setPatientId] = useState(user?.role === 'Patient' ? user?.patientId || 'P-1001' : 'P-2001');
+  const isStaff = ['Doctor', 'Nurse', 'Admin'].includes(user?.role);
+
+  const [patients, setPatients] = useState([]);
+  const [patientFilter, setPatientFilter] = useState('');
+  const [selectedPatientId, setSelectedPatientId] = useState(null);
+
   const [records, setRecords] = useState([]);
   const [files, setFiles] = useState([]);
   const [form, setForm] = useState({ patientId: '', author: '', diagnosis: '', notes: '' });
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const params = user?.role === 'Patient' ? {} : { patientId };
+    if (isStaff) {
+      api.get('/api/patients').then(r => setPatients(r.data.patients || [])).catch(() => {});
+    }
+  }, [isStaff]);
+
+  const loadPatientData = useCallback((pid) => {
+    setSelectedPatientId(pid);
+    const params = { patientId: pid };
     api.get('/api/records', { params })
-      .then(response => setRecords((response.data.records || []).filter(r => r.data?.diagnosis)))
+      .then(r => setRecords((r.data.records || []).filter(rec => rec.data?.diagnosis)))
       .catch(() => setRecords([]));
-    api.get('/api/files', { params }).then(r => setFiles(r.data.files || [])).catch(() => setFiles([]));
-  }, [patientId, user]);
+    api.get('/api/files', { params })
+      .then(r => setFiles(r.data.files || []))
+      .catch(() => setFiles([]));
+  }, []);
+
+  useEffect(() => {
+    if (!isStaff && user?.patientId) {
+      loadPatientData(user.patientId);
+    }
+  }, [isStaff, user, loadPatientData]);
 
   const downloadFile = async (f) => {
     try {
@@ -33,33 +53,30 @@ function Records() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
+    } catch {
       alert('Unable to download file. Please check your permissions.');
     }
   };
 
   const submitRecord = async (event) => {
     event.preventDefault();
-    const payload = {
-      patientId: form.patientId || patientId,
-      author: form.author,
-      data: { diagnosis: form.diagnosis, notes: form.notes }
-    };
-
+    const targetPid = form.patientId || selectedPatientId;
+    const payload = { patientId: targetPid, author: form.author, data: { diagnosis: form.diagnosis, notes: form.notes } };
     try {
       const response = await api.post('/api/records', payload);
       setMessage(response.data.message);
       setForm({ patientId: '', author: '', diagnosis: '', notes: '' });
-      if (user?.role !== 'Patient') {
-        await api.get('/api/records', { params: { patientId: payload.patientId } })
-          .then(res => setRecords((res.data.records || []).filter(r => r.data?.diagnosis)));
-        await api.get('/api/files', { params: { patientId: payload.patientId } })
-          .then(r => setFiles(r.data.files || []));
-      }
+      if (targetPid) loadPatientData(targetPid);
     } catch (error) {
       setMessage(error.response?.data?.error || 'Submission failed');
     }
   };
+
+  const filteredPatients = patients.filter(p =>
+    `${p.patientId} ${p.name} ${p.phone}`.toLowerCase().includes(patientFilter.toLowerCase())
+  );
+
+  const selectedPatient = patients.find(p => p.patientId === selectedPatientId);
 
   return (
     <section className="section section-alt">
@@ -67,33 +84,53 @@ function Records() {
         <div className="record-panel">
           <div className="section-heading">
             <span className="eyebrow">Patient records</span>
-            <h2>{user?.role === 'Patient' ? 'Your secure health record' : 'Manage secure healthcare transactions'}</h2>
-            <p>{user?.role === 'Patient'
-              ? 'Review your protected medical history and audit trail entries stored in the HealthLedger blockchain.'
-              : 'Submit encrypted record updates and review decrypted entries for an encrypted patient ledger.'
+            <h2>{isStaff ? 'All patient records' : 'Your secure health record'}</h2>
+            <p>{isStaff
+              ? 'Browse all patients below or search by ID. Click a patient to view their records and files.'
+              : 'Review your protected medical history and audit trail entries stored in the HealthLedger blockchain.'
             }</p>
           </div>
-          {['Doctor', 'Nurse', 'Admin'].includes(user?.role) ? (
-            <form className="record-form" onSubmit={submitRecord}>
-              <label>
-                Patient ID
-                <input value={form.patientId} onChange={e => setForm({ ...form, patientId: e.target.value })} placeholder="e.g. P-1002" />
+          {isStaff ? (
+            <>
+              <label className="search-label">
+                Search patients
+                <input value={patientFilter} onChange={e => setPatientFilter(e.target.value)} placeholder="Search by name, ID or phone..." />
               </label>
-              <label>
-                Author
-                <input value={form.author} onChange={e => setForm({ ...form, author: e.target.value })} placeholder="Dr. Name or Nurse" />
-              </label>
-              <label>
-                Diagnosis
-                <textarea value={form.diagnosis} onChange={e => setForm({ ...form, diagnosis: e.target.value })} rows="3" />
-              </label>
-              <label>
-                Notes
-                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows="4" />
-              </label>
-              <button type="submit" className="button primary">Submit record</button>
-              {message && <p className="form-message">{message}</p>}
-            </form>
+              <div className="patient-list">
+                {filteredPatients.length === 0 && <p>No patients found.</p>}
+                {filteredPatients.map(p => (
+                  <button
+                    key={p.patientId}
+                    type="button"
+                    className={`patient-row ${p.patientId === selectedPatientId ? 'active' : ''}`}
+                    onClick={() => loadPatientData(p.patientId)}
+                  >
+                    <span className="patient-row-id">{p.patientId}</span>
+                    <span className="patient-row-name">{p.name}</span>
+                    <span className="patient-row-phone">{p.phone}</span>
+                  </button>
+                ))}
+              </div>
+              {selectedPatient && (
+                <form className="record-form" onSubmit={submitRecord} style={{ marginTop: '1.5rem' }}>
+                  <h4>Add record for {selectedPatient.name} ({selectedPatient.patientId})</h4>
+                  <label>
+                    Author
+                    <input value={form.author} onChange={e => setForm({ ...form, author: e.target.value })} placeholder="Dr. Name or Nurse" />
+                  </label>
+                  <label>
+                    Diagnosis
+                    <textarea value={form.diagnosis} onChange={e => setForm({ ...form, diagnosis: e.target.value })} rows="3" />
+                  </label>
+                  <label>
+                    Notes
+                    <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows="4" />
+                  </label>
+                  <button type="submit" className="button primary">Submit record</button>
+                  {message && <p className="form-message">{message}</p>}
+                </form>
+              )}
+            </>
           ) : (
             <div className="patient-note">
               <p>You can view your own medical history below. Contact your healthcare provider for record updates.</p>
@@ -104,15 +141,11 @@ function Records() {
         <div className="history-panel">
           <div className="section-heading">
             <span className="eyebrow">Audit history</span>
-            <h3>Patient record history</h3>
-            <p>Review decrypted records pulled from the secure blockchain ledger by patient identifier.</p>
+            <h3>{selectedPatient ? `${selectedPatient.name} (${selectedPatient.patientId})` : 'Your'} record history</h3>
+            <p>Review decrypted records pulled from the secure blockchain ledger.</p>
           </div>
-          <label className="search-label">
-            View records for Patient ID
-            <input value={patientId} onChange={e => setPatientId(e.target.value)} placeholder="P-1001" />
-          </label>
           {records.length === 0 ? (
-            <p>No records found for this patient yet.</p>
+            <p>{isStaff && !selectedPatientId ? 'Select a patient to view their records.' : 'No records found for this patient yet.'}</p>
           ) : (
             records.map((record, index) => (
               <article key={`${record.hash}-${index}`} className="history-card">

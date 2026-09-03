@@ -76,6 +76,15 @@ function authorizeRoles(...allowedRoles) {
   };
 }
 
+function getAllPatients() {
+  return users.filter(u => u.role === 'Patient').map(u => ({
+    name: u.name,
+    patientId: u.patientId,
+    phone: u.phone,
+    age: u.age
+  }));
+}
+
 module.exports = {
   findUser,
   findUserByPhone,
@@ -84,5 +93,6 @@ module.exports = {
   generateToken,
   authenticateToken,
   authorizeRoles,
-  createPatientUser
+  createPatientUser,
+  getAllPatients
 };

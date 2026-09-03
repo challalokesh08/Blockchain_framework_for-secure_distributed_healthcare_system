@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { Blockchain, PatientRecordTransaction } = require('./blockchain');
-const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser } = require('./auth');
+const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients } = require('./auth');
 const { getUserByPatientId } = require('./auth');
 const { sendSMS } = require('./notifications');
 const multer = require('multer');
@@ -92,6 +92,10 @@ app.get('/api/status', (req, res) => {
 
 app.get('/api/ledger', authenticateToken, authorizeRoles('Doctor', 'Nurse', 'Admin', 'Patient'), (req, res) => {
   res.json(ledger.chain);
+});
+
+app.get('/api/patients', authenticateToken, authorizeRoles('Doctor', 'Nurse', 'Admin'), (req, res) => {
+  res.json({ patients: getAllPatients() });
 });
 
 app.get('/api/records', authenticateToken, authorizeRoles('Doctor', 'Nurse', 'Admin', 'Patient'), (req, res) => {
