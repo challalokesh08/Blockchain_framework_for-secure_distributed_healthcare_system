@@ -8,11 +8,12 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import RecordsScreen from './src/screens/RecordsScreen';
 import UploadScreen from './src/screens/UploadScreen';
+import StaffRecordsScreen from './src/screens/StaffRecordsScreen';
 
 const Stack = createNativeStackNavigator();
 
 function Navigator() {
-  const { isAuthenticated, loading } = useContext(AuthContext);
+  const { isAuthenticated, loading, user } = useContext(AuthContext);
   if (loading) return <View style={s.ld}><ActivityIndicator size="large" color="#5b8ff9" /></View>;
   return (
     <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#0b1118' }, headerTintColor: '#fff', contentStyle: { backgroundColor: '#08101a' } }}>
@@ -22,6 +23,7 @@ function Navigator() {
       {isAuthenticated && (
         <>
           <Stack.Screen name="Records" component={RecordsScreen} options={{ title: 'My Records' }} />
+          {user?.role !== 'Patient' && <Stack.Screen name="StaffRecords" component={StaffRecordsScreen} options={{ title: 'Patient Records' }} />}
           <Stack.Screen name="Upload" component={UploadScreen} options={{ title: 'Upload File' }} />
         </>
       )}

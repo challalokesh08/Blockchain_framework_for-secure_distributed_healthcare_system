@@ -30,6 +30,7 @@ export default function HomeScreen({ navigation }) {
       {isAuthenticated ? (
         <>
           <Btn title="My Records" color="#5b8ff9" onPress={() => navigation.navigate('Records')} />
+          {user?.role !== 'Patient' && <View style={{ marginTop: 8 }}><Btn title="View Patient Records" color="#e2b95f" onPress={() => navigation.navigate('StaffRecords')} /></View>}
           {user?.role !== 'Patient' && <View style={{ marginTop: 8 }}><Btn title="Upload File" color="#58d9a6" onPress={() => navigation.navigate('Upload')} /></View>}
           <View style={{ marginTop: 16 }}><Btn title="Logout" color="#ff6b6b" onPress={() => logout()} /></View>
         </>
