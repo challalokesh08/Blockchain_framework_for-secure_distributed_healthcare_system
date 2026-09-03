@@ -35,7 +35,7 @@ export default function UploadScreen() {
     <View style={s.container}>
       <Text style={s.title}>Upload Report</Text>
       <Text style={s.sub}>Upload a file for a patient</Text>
-      <TextInput style={s.input} placeholder="Patient ID (e.g. P-1001)" placeholderTextColor="#666" value={patientId} onChangeText={setPatientId} />
+      <TextInput style={s.input} placeholder="Patient ID (e.g. P-2001)" placeholderTextColor="#666" value={patientId} onChangeText={setPatientId} />
       {loading ? <ActivityIndicator size="small" color="#58d9a6" style={{ marginVertical: 12 }} /> : <Button title="Pick & Upload File" color="#58d9a6" onPress={pickAndUpload} />}
       {message ? <Text style={[s.msg, { color: message.includes('fail') || message.includes('Error') ? '#ff6b6b' : '#58d9a6' }]}>{message}</Text> : null}
     </View>
