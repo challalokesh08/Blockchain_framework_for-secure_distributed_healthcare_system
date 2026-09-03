@@ -3,7 +3,7 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { Blockchain, PatientRecordTransaction } = require('./blockchain');
-const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients } = require('./auth');
+const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients, seedPatient } = require('./auth');
 const { getUserByPatientId } = require('./auth');
 const { sendSMS } = require('./notifications');
 const multer = require('multer');
@@ -41,6 +41,25 @@ const app = express();
 const port = process.env.PORT || 4000;
 const ledger = new Blockchain();
 const contractEngine = new ContractEngine(ledger);
+
+// Seed 110 patients + medical records on startup so data persists across redeploys
+try {
+  const dataset = require('../dataset');
+  let seeded = 0;
+  for (const p of dataset) {
+    const user = seedPatient({ patientId: p.patientId, name: p.name, age: p.age, phone: p.phone });
+    if (user) {
+      seeded++;
+      ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { diagnosis: p.diagnosis, notes: p.news, department: p.department, physician: p.doctor } });
+    }
+  }
+  if (seeded > 0) {
+    ledger.minePendingTransactions('seed-node');
+    console.log(`Seeded ${seeded} patients and their records on startup`);
+  }
+} catch (err) {
+  console.error('Seed failed (non-fatal):', err.message);
+}
 
 app.use(cors());
 app.use(express.json());

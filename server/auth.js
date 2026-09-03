@@ -46,6 +46,21 @@ function createPatientUser(details) {
   return user;
 }
 
+function seedPatient(details) {
+  if (users.find(u => u.patientId === details.patientId)) return null;
+  const user = {
+    username: `patient_${details.patientId}`,
+    password: bcrypt.hashSync('patientpass', 10),
+    role: 'Patient',
+    name: details.name,
+    age: details.age,
+    phone: details.phone,
+    patientId: details.patientId
+  };
+  users.push(user);
+  return user;
+}
+
 function generateToken(user) {
   return jwt.sign({ username: user.username, role: user.role, name: user.name, patientId: user.patientId || null, phone: user.phone || null }, JWT_SECRET, { expiresIn: '8h' });
 }
@@ -94,5 +109,6 @@ module.exports = {
   authenticateToken,
   authorizeRoles,
   createPatientUser,
-  getAllPatients
+  getAllPatients,
+  seedPatient
 };
