@@ -291,7 +291,7 @@ Every patient below has a **live login account** on the deployed backend.
 
 ## Mobile App Setup
 
-The `mobile/` directory contains an Expo React Native app.
+The `mobile/` directory contains an Expo React Native app that talks to the same deployed backend — the same patient accounts work here.
 
 ```bash
 cd mobile
@@ -300,8 +300,16 @@ npx expo start
 ```
 
 - Scan the QR code with Expo Go (iOS/Android)
-- The app connects to `http://10.0.2.2:4000` by default (Android emulator)
-- For physical device, update `mobile/src/api.js` with your machine's local IP
+- The app connects to the deployed backend (`healthledger-api.onrender.com`) by default
+- For a local backend, update `mobile/src/api.js` with your machine's IP (e.g. `http://192.168.x.x:4000`)
+
+### Mobile screens
+
+| Screen | Visible to | What it does |
+|--------|-----------|--------------|
+| **My Records** | All (Patient + Staff) | Shows the logged-in user's own records |
+| **View Patient Records** | Doctor / Nurse / Admin only | Search **any** patient ID and see their records + files |
+| **Upload File** | Doctor / Nurse / Admin only | Upload a medical file for a patient |
 
 ---
 
