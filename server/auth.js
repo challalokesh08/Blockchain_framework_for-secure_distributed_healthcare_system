@@ -32,7 +32,7 @@ function verifyPassword(user, rawPassword) {
 function createPatientUser(details) {
   const nextId = users.filter(u => u.role === 'Patient').length + 2;
   const username = `patient${nextId}`;
-  const patientId = `P-${1000 + nextId}`;
+  const patientId = details.patientId || `P-${1000 + nextId}`;
   const user = {
     username,
     password: bcrypt.hashSync(details.password, 10),

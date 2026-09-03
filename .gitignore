@@ -9,3 +9,5 @@ server/uploads/
 server/notifications/
 client/dist/
 client/dist
+generated-images/
+_gen_img.py

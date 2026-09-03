@@ -66,8 +66,8 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/register', (req, res) => {
-  const { name, age, phone, password } = req.body;
-  if (!name || !age || !phone || !password) {
+  const { name, age, phone, password, patientId } = req.body;
+  if (!name || age === undefined || age === null || !phone || !password) {
     return res.status(400).json({ error: 'Name, age, phone number, and password are required for registration.' });
   }
 
@@ -76,7 +76,7 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(409).json({ error: 'Phone number is already registered.' });
   }
 
-  const user = createPatientUser({ name, age, phone: normalizedPhone, password });
+  const user = createPatientUser({ name, age, phone: normalizedPhone, password, patientId });
   const token = generateToken(user);
   res.status(201).json({ token, user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone } });
 });
@@ -157,7 +157,7 @@ app.post('/api/files/upload', authenticateToken, authorizeRoles('Doctor', 'Nurse
 
   // generate signed download URL valid for configured expiry
   const jwt = require('jsonwebtoken');
-  const downloadSecret = process.env.DOWNLOAD_SECRET || process.env.JWT_SECRET;
+  const downloadSecret = process.env.DOWNLOAD_SECRET || process.env.JWT_SECRET || 'HealthcareJwtSecret2026!';
   const expirySeconds = parseInt(process.env.DOWNLOAD_URL_EXPIRY || '86400', 10); // default 24h
   const token = jwt.sign({ filename: meta.filename }, downloadSecret, { expiresIn: expirySeconds });
   const signedLink = `${req.protocol}://${req.get('host')}/api/files/${encodeURIComponent(meta.filename)}?token=${token}`;
@@ -179,7 +179,7 @@ app.get('/api/files/:filename', async (req, res) => {
 
   // try query token first (signed URL)
   const jwtLib = require('jsonwebtoken');
-  const downloadSecret = process.env.DOWNLOAD_SECRET || process.env.JWT_SECRET;
+  const downloadSecret = process.env.DOWNLOAD_SECRET || process.env.JWT_SECRET || 'HealthcareJwtSecret2026!';
   let allowed = false;
 
   if (qtoken) {
