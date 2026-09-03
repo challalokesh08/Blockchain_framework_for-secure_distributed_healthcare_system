@@ -1,5 +1,5 @@
 import { useEffect, useState, useContext } from 'react';
-import api from '../api.js';
+import api, { apiBase } from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
 export default function Notifications() {
@@ -38,7 +38,7 @@ export default function Notifications() {
               {n.type === 'record' ? (
                 <div><strong>Record:</strong> {n.data.data?.diagnosis || n.data.data?.summary || 'New record'}</div>
               ) : (
-                <div><strong>File:</strong> <a href={`https://healthledger-api.onrender.com/api/files/${encodeURIComponent(n.data.filename)}`} target="_blank" rel="noreferrer">{n.data.originalname}</a></div>
+                <div><strong>File:</strong> <a href={`${apiBase}/api/files/${encodeURIComponent(n.data.filename)}`} target="_blank" rel="noreferrer">{n.data.originalname}</a></div>
               )}
             </li>
           ))}

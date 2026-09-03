@@ -4,7 +4,7 @@ import { AuthContext } from '../AuthContext.jsx';
 
 function Records() {
   const { user } = useContext(AuthContext);
-  const [patientId, setPatientId] = useState(user?.role === 'Patient' ? user?.patientId || 'P-1001' : 'P-1001');
+  const [patientId, setPatientId] = useState(user?.role === 'Patient' ? user?.patientId || 'P-1001' : 'P-2001');
   const [records, setRecords] = useState([]);
   const [files, setFiles] = useState([]);
   const [form, setForm] = useState({ patientId: '', author: '', diagnosis: '', notes: '' });
@@ -13,10 +13,30 @@ function Records() {
   useEffect(() => {
     const params = user?.role === 'Patient' ? {} : { patientId };
     api.get('/api/records', { params })
-      .then(response => setRecords(response.data.records))
+      .then(response => setRecords((response.data.records || []).filter(r => r.data?.diagnosis)))
       .catch(() => setRecords([]));
     api.get('/api/files', { params }).then(r => setFiles(r.data.files || [])).catch(() => setFiles([]));
   }, [patientId, user]);
+
+  const downloadFile = async (f) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await api.get(`/api/files/${encodeURIComponent(f.filename)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = f.originalname || f.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Unable to download file. Please check your permissions.');
+    }
+  };
 
   const submitRecord = async (event) => {
     event.preventDefault();
@@ -30,6 +50,12 @@ function Records() {
       const response = await api.post('/api/records', payload);
       setMessage(response.data.message);
       setForm({ patientId: '', author: '', diagnosis: '', notes: '' });
+      if (user?.role !== 'Patient') {
+        await api.get('/api/records', { params: { patientId: payload.patientId } })
+          .then(res => setRecords((res.data.records || []).filter(r => r.data?.diagnosis)));
+        await api.get('/api/files', { params: { patientId: payload.patientId } })
+          .then(r => setFiles(r.data.files || []));
+      }
     } catch (error) {
       setMessage(error.response?.data?.error || 'Submission failed');
     }
@@ -94,8 +120,10 @@ function Records() {
                   <span><strong>{record.author}</strong></span>
                   <span>{new Date(record.timestamp).toLocaleString()}</span>
                 </div>
+                <p><strong>Department:</strong> {record.data?.department || 'General'}</p>
                 <p><strong>Diagnosis:</strong> {record.data?.diagnosis || 'N/A'}</p>
                 <p><strong>Notes:</strong> {record.data?.notes || 'N/A'}</p>
+                {record.data?.physician && <p><strong>Physician:</strong> {record.data.physician}</p>}
                 <p className="history-card-hash">Block Hash: {record.hash}</p>
               </article>
             ))
@@ -110,7 +138,7 @@ function Records() {
                     <span>{new Date(f.timestamp).toLocaleString()}</span>
                   </div>
                   <p>Size: {f.size} bytes | Type: {f.mimetype}</p>
-                  <p><a className="button secondary" href={`https://healthledger-api.onrender.com/api/files/${encodeURIComponent(f.filename)}`} target="_blank" rel="noreferrer">Download</a></p>
+                  <p><button type="button" className="button secondary" onClick={() => downloadFile(f)}>Download</button></p>
                 </article>
               ))
             )}
