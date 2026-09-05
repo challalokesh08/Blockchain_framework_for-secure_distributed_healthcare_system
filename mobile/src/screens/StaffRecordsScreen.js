@@ -10,6 +10,7 @@ export default function StaffRecordsScreen() {
   const [selected, setSelected] = useState(null);
   const [records, setRecords] = useState([]);
   const [files, setFiles] = useState([]);
+  const [accessError, setAccessError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -21,16 +22,27 @@ export default function StaffRecordsScreen() {
   }, []);
 
   const selectPatient = async (p) => {
-    setSelected(p); setLoadingDetail(true);
+    setSelected(p); setLoadingDetail(true); setAccessError(''); setRecords([]); setFiles([]);
     try {
-      const [rRes, fRes] = await Promise.all([
-        api.get('/api/records', { params: { patientId: p.patientId } }).catch(() => ({ data: { records: [] } })),
-        api.get('/api/files', { params: { patientId: p.patientId } }).catch(() => ({ data: { files: [] } }))
-      ]);
-      setRecords((rRes.data?.records || []).filter(r => r.data?.diagnosis));
-      setFiles(fRes.data?.files || []);
-    } catch {
-      Alert.alert('Error', 'Could not load records.');
+      const rRes = await api.get('/api/records', { params: { patientId: p.patientId } });
+      let fRes = { data: { files: [] } };
+      try {
+        fRes = await api.get('/api/files', { params: { patientId: p.patientId } });
+      } catch (err) {
+        if (err.response?.status === 403) {
+          setAccessError(err.response.data?.error || 'Patient consent required for files.');
+        }
+      }
+      setRecords((rRes.data.records || []).filter(r => r.data?.diagnosis));
+      setFiles(fRes.data.files || []);
+    } catch (err) {
+      if (err.response?.status === 403) {
+        setAccessError(err.response.data?.error || 'Patient consent required.');
+        setRecords([]);
+        setFiles([]);
+      } else {
+        Alert.alert('Error', 'Could not load records.');
+      }
     } finally {
       setLoadingDetail(false);
     }
@@ -54,6 +66,13 @@ export default function StaffRecordsScreen() {
         <Text style={s.sub}>Patient: {selected.patientId} | {selected.phone}</Text>
         {loadingDetail ? <ActivityIndicator size="large" color="#5b8ff9" style={{ marginTop: 24 }} /> : (
           <>
+            {accessError ? (
+              <>
+                <Text style={s.accessError}>{accessError}</Text>
+                <Text style={s.hint}>Ask the patient to grant consent on their Records screen, then try again.</Text>
+              </>
+            ) : (
+              <>
             <Text style={s.resultHead}>{records.length} record(s) · {files.length} file(s)</Text>
             <FlatList
               data={items}
@@ -83,6 +102,8 @@ export default function StaffRecordsScreen() {
                 );
               }}
             />
+              </>
+            )}
           </>
         )}
       </View>
@@ -130,6 +151,7 @@ const s = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   input: { borderColor: '#333', borderWidth: 1, padding: 12, marginBottom: 10, borderRadius: 8, color: '#fff', backgroundColor: '#111', fontSize: 16 },
   hint: { fontSize: 13, color: '#666', marginTop: 8, textAlign: 'center' },
+  accessError: { fontSize: 14, color: '#ffb063', marginTop: 16, textAlign: 'center', lineHeight: 20 },
   resultHead: { fontSize: 13, color: '#888', marginTop: 4 },
   card: { padding: 14, borderWidth: 1, borderColor: '#333', borderRadius: 10, marginBottom: 10, backgroundColor: '#111' },
   head: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },

@@ -15,11 +15,11 @@ function Explorer() {
   return (
     <section className="section">
       <div className="container">
-        <div className="section-heading">
-          <span className="eyebrow">Blockchain explorer</span>
-          <h2>Inspect the healthcare ledger</h2>
-          <p>Explore the chain blocks, transaction summaries, and encrypted patient record entries for transparency and audit compliance.</p>
-        </div>
+<div className="section-heading">
+            <span className="eyebrow">Blockchain explorer</span>
+            <h2>Inspect the healthcare ledger</h2>
+            <p>Explore Proof-of-Authority sealed blocks, transaction data-hashes, and encrypted off-chain record references for transparency and audit compliance.</p>
+          </div>
         {isLoading ? (
           <p>Loading ledger data…</p>
         ) : (
@@ -33,6 +33,8 @@ function Explorer() {
                 <div className="ledger-card-body">
                   <p><strong>Hash:</strong> {block.hash}</p>
                   <p><strong>Previous:</strong> {block.previousHash}</p>
+                  <p><strong>Sealed by:</strong> {block.validator}</p>
+                  <p><strong>Signature:</strong> {block.signature?.substring(0, 24)}…</p>
                   <p><strong>Transactions:</strong> {block.transactions.length}</p>
                 </div>
               </article>

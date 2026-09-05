@@ -9,16 +9,16 @@ function About() {
         </div>
         <div className="about-cards">
           <article className="about-card">
-            <h3>Secure design</h3>
-            <p>Encrypted patient records and cryptographic validation guard against unauthorized access and tampering.</p>
+            <h3>Asymmetric security</h3>
+            <p>Patient records are encrypted with hybrid RSA/AES cryptography and hashed onto a Proof-of-Authority ledger.</p>
           </article>
           <article className="about-card">
-            <h3>Clinical insights</h3>
-            <p>Maintain traceable record history for clinicians, auditors, and administrators with a clean interface.</p>
+            <h3>Patient-controlled access</h3>
+            <p>Consent smart contracts decide who may read a patient's records — revoking consent revokes access instantly.</p>
           </article>
           <article className="about-card">
-            <h3>Enterprise-ready</h3>
-            <p>The framework is built to integrate with distributed nodes, API services, and healthcare workflow platforms.</p>
+            <h3>Stakeholder-ready</h3>
+            <p>Built for doctors, hospitals, laboratories, insurers, and patients with a role-aware, audit-ready workflow.</p>
           </article>
         </div>
       </div>

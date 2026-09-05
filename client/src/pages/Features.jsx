@@ -1,9 +1,9 @@
 function Features() {
   const features = [
-    { title: 'Encrypted patient data', description: 'Records are encrypted before they are stored, ensuring privacy and compliance readiness.' },
-    { title: 'Proof of integrity', description: 'Every block is cryptographically linked to the previous block, making tampering transparent.' },
-    { title: 'Audit-ready ledger', description: 'View block history and transactions with a data-driven medical audit trail.' },
-    { title: 'Role-aware access', description: 'Designed for doctor, nurse, and administrator workflows in a healthcare environment.' },
+    { title: 'Asymmetric (hybrid) encryption', description: 'Records are encrypted with AES-256-GCM and wrapped with RSA-2048 public keys before off-chain storage.' },
+    { title: 'Proof-of-Authority consensus', description: 'Blocks are sealed by a rotating set of trusted validators — no energy-intensive mining.' },
+    { title: 'Off-chain data, on-chain proof', description: 'Only hashes and metadata live on the ledger; full encrypted records stay off-chain for scale.' },
+    { title: 'Patient-controlled consent', description: 'Smart contracts enforce consent — providers can only read records the patient authorizes.' },
     { title: 'Modern UX', description: 'Professional dashboard design with clear metrics, forms, and record explorer pages.' }
   ];
 

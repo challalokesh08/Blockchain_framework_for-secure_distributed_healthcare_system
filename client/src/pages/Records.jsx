@@ -2,9 +2,12 @@ import { useContext, useEffect, useState, useCallback } from 'react';
 import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
+const STAFF_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory', 'Insurance'];
+const PROVIDER_TYPES = ['Doctor', 'Hospital', 'Laboratory', 'Insurance'];
+
 function Records() {
   const { user } = useContext(AuthContext);
-  const isStaff = ['Doctor', 'Nurse', 'Admin'].includes(user?.role);
+  const isStaff = STAFF_ROLES.includes(user?.role);
 
   const [patients, setPatients] = useState([]);
   const [patientFilter, setPatientFilter] = useState('');
@@ -12,24 +15,41 @@ function Records() {
 
   const [records, setRecords] = useState([]);
   const [files, setFiles] = useState([]);
+  const [accessMessage, setAccessMessage] = useState('');
+  const [consents, setConsents] = useState([]);
+  const [consentForm, setConsentForm] = useState({ providerName: '', providerType: 'Doctor', purpose: 'Healthcare data access' });
+  const [consentMessage, setConsentMessage] = useState('');
   const [form, setForm] = useState({ patientId: '', author: '', diagnosis: '', notes: '' });
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (isStaff) {
       api.get('/api/patients').then(r => setPatients(r.data.patients || [])).catch(() => {});
+    } else if (user?.patientId) {
+      loadConsents(user.patientId);
     }
-  }, [isStaff]);
+  }, [isStaff, user]);
+
+  const loadConsents = (pid) => {
+    api.get('/api/consent', { params: { patientId: pid } })
+      .then(r => setConsents(r.data.consents || []))
+      .catch(() => setConsents([]));
+  };
 
   const loadPatientData = useCallback((pid) => {
     setSelectedPatientId(pid);
+    setAccessMessage('');
     const params = { patientId: pid };
     api.get('/api/records', { params })
       .then(r => setRecords((r.data.records || []).filter(rec => rec.data?.diagnosis)))
-      .catch(() => setRecords([]));
+      .catch(err => {
+        setRecords([]);
+        setFiles([]);
+        setAccessMessage(err.response?.data?.error || 'Unable to load records.');
+      });
     api.get('/api/files', { params })
       .then(r => setFiles(r.data.files || []))
-      .catch(() => setFiles([]));
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -72,6 +92,30 @@ function Records() {
     }
   };
 
+  const grantConsent = async (event) => {
+    event.preventDefault();
+    setConsentMessage('');
+    try {
+      await api.post('/api/consent', consentForm);
+      setConsentMessage('Consent granted. The provider can now access your records.');
+      setConsentForm({ providerName: '', providerType: 'Doctor', purpose: 'Healthcare data access' });
+      loadConsents(user.patientId);
+    } catch (err) {
+      setConsentMessage(err.response?.data?.error || 'Unable to grant consent.');
+    }
+  };
+
+  const revokeConsent = async (c) => {
+    setConsentMessage('');
+    try {
+      await api.delete('/api/consent', { data: { providerName: c.providerName, providerType: c.providerType } });
+      setConsentMessage(`Consent for ${c.providerName} revoked.`);
+      loadConsents(user.patientId);
+    } catch (err) {
+      setConsentMessage(err.response?.data?.error || 'Unable to revoke consent.');
+    }
+  };
+
   const filteredPatients = patients.filter(p =>
     `${p.patientId} ${p.name} ${p.phone}`.toLowerCase().includes(patientFilter.toLowerCase())
   );
@@ -86,8 +130,8 @@ function Records() {
             <span className="eyebrow">Patient records</span>
             <h2>{isStaff ? 'All patient records' : 'Your secure health record'}</h2>
             <p>{isStaff
-              ? 'Browse all patients below or search by ID. Click a patient to view their records and files.'
-              : 'Review your protected medical history and audit trail entries stored in the HealthLedger blockchain.'
+              ? 'Access is patient-controlled. You can only view records for patients who have granted you consent.'
+              : 'Review your protected medical history and control who may access it via consent management.'
             }</p>
           </div>
           {isStaff ? (
@@ -111,6 +155,7 @@ function Records() {
                   </button>
                 ))}
               </div>
+              {accessMessage && <p className="consent-warning">{accessMessage}</p>}
               {selectedPatient && (
                 <form className="record-form" onSubmit={submitRecord} style={{ marginTop: '1.5rem' }}>
                   <h4>Add record for {selectedPatient.name} ({selectedPatient.patientId})</h4>
@@ -132,9 +177,48 @@ function Records() {
               )}
             </>
           ) : (
-            <div className="patient-note">
-              <p>You can view your own medical history below. Contact your healthcare provider for record updates.</p>
-            </div>
+            <>
+              <div className="patient-note">
+                <p>You can view your own medical history below. Contact your healthcare provider for record updates.</p>
+              </div>
+              <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
+                <h4>Consent management</h4>
+                <p>Grant or revoke access to your records. Providers without active consent are blocked by the smart contract.</p>
+                <form className="record-form" onSubmit={grantConsent}>
+                  <label>
+                    Provider
+                    <input value={consentForm.providerName} onChange={e => setConsentForm({ ...consentForm, providerName: e.target.value })} placeholder="e.g. Metropolis Diagnostics Lab" required />
+                  </label>
+                  <label>
+                    Provider type
+                    <select value={consentForm.providerType} onChange={e => setConsentForm({ ...consentForm, providerType: e.target.value })}>
+                      {PROVIDER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    Purpose
+                    <input value={consentForm.purpose} onChange={e => setConsentForm({ ...consentForm, purpose: e.target.value })} required />
+                  </label>
+                  <button type="submit" className="button primary">Grant consent</button>
+                </form>
+                {consentMessage && <p className="form-message">{consentMessage}</p>}
+                <div style={{ marginTop: '1rem' }}>
+                  {consents.length === 0 ? <p>No consents yet.</p> : (
+                    consents.map(c => (
+                      <div key={c.consentId} className="consent-row">
+                        <div>
+                          <strong>{c.providerName}</strong> ({c.providerType}) — <span>{c.status}</span>
+                          <p className="consent-purpose">{c.purpose}</p>
+                        </div>
+                        {c.status === 'ACTIVE' && (
+                          <button className="button secondary" onClick={() => revokeConsent(c)}>Revoke</button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
 
@@ -144,7 +228,9 @@ function Records() {
             <h3>{selectedPatient ? `${selectedPatient.name} (${selectedPatient.patientId})` : 'Your'} record history</h3>
             <p>Review decrypted records pulled from the secure blockchain ledger.</p>
           </div>
-          {records.length === 0 ? (
+          {!isStaff && records.length === 0 && accessMessage ? (
+            <p className="consent-warning">{accessMessage}</p>
+          ) : records.length === 0 ? (
             <p>{isStaff && !selectedPatientId ? 'Select a patient to view their records.' : 'No records found for this patient yet.'}</p>
           ) : (
             records.map((record, index) => (
@@ -157,25 +243,27 @@ function Records() {
                 <p><strong>Diagnosis:</strong> {record.data?.diagnosis || 'N/A'}</p>
                 <p><strong>Notes:</strong> {record.data?.notes || 'N/A'}</p>
                 {record.data?.physician && <p><strong>Physician:</strong> {record.data.physician}</p>}
-                <p className="history-card-hash">Block Hash: {record.hash}</p>
+                <p className="history-card-hash">Data Hash: {record.dataHash?.substring(0, 32)}… | Sealed by {record.validator}</p>
               </article>
             ))
           )}
-          <div style={{ marginTop: '1.5rem' }}>
-            <h4>Files</h4>
-            {files.length === 0 ? <p>No files uploaded for this patient.</p> : (
-              files.map((f) => (
-                <article key={f.filename} className="history-card">
-                  <div className="history-card-meta">
-                    <span><strong>{f.originalname}</strong></span>
-                    <span>{new Date(f.timestamp).toLocaleString()}</span>
-                  </div>
-                  <p>Size: {f.size} bytes | Type: {f.mimetype}</p>
-                  <p><button type="button" className="button secondary" onClick={() => downloadFile(f)}>Download</button></p>
-                </article>
-              ))
-            )}
-          </div>
+          {!accessMessage && (
+            <div style={{ marginTop: '1.5rem' }}>
+              <h4>Files</h4>
+              {files.length === 0 ? <p>No files uploaded for this patient.</p> : (
+                files.map((f) => (
+                  <article key={f.filename} className="history-card">
+                    <div className="history-card-meta">
+                      <span><strong>{f.originalname}</strong></span>
+                      <span>{new Date(f.timestamp).toLocaleString()}</span>
+                    </div>
+                    <p>Size: {f.size} bytes | Type: {f.mimetype}</p>
+                    <p><button type="button" className="button secondary" onClick={() => downloadFile(f)}>Download</button></p>
+                  </article>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -18,7 +18,7 @@ function Home() {
           <div className="hero-copy">
             <span className="eyebrow">Healthcare blockchain</span>
             <h2>Secure patient records on a tamper-proof distributed ledger</h2>
-            <p>HealthLedger supports doctors, hospital staff, and patients with trusted data access, encrypted medical workflows, and audit-ready infrastructure.</p>
+            <p>HealthLedger connects doctors, hospitals, laboratories, insurers, and patients with encrypted records, patient-controlled consent, and a Proof-of-Authority blockchain.</p>
             <div className="hero-actions">
               <Link className="button primary" to="/features">Discover Features</Link>
               <Link className="button secondary" to="/login">Sign In</Link>
@@ -30,6 +30,8 @@ function Home() {
               {status ? (
                 <ul>
                   <li>Network status: <strong>{status.status}</strong></li>
+                  <li>Consensus: <strong>{status.consensus}</strong></li>
+                  <li>Validators: <strong>{status.validators}</strong></li>
                   <li>Blocks: <strong>{status.blocks}</strong></li>
                   <li>Pending items: <strong>{status.pendingTransactions}</strong></li>
                   <li>Ledger valid: <strong>{status.valid ? 'Yes' : 'No'}</strong></li>
@@ -51,7 +53,11 @@ function Home() {
             </article>
             <article className="feature-highlight-card">
               <h3>Hospital staff & administrators</h3>
-              <p>Control access policies, approve contracts, and maintain compliance with a polished enterprise-grade dashboard.</p>
+              <p>Control access policies, approve contracts, and maintain compliance with an enterprise-grade consent-aware dashboard.</p>
+            </article>
+            <article className="feature-highlight-card">
+              <h3>Laboratories & insurers</h3>
+              <p>Share test results and verify claims on-chain — access is unlocked only when the patient grants consent.</p>
             </article>
             <article className="feature-highlight-card">
               <h3>Connected patients</h3>

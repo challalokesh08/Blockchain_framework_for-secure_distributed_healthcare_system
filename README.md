@@ -70,13 +70,47 @@ JWT_SECRET=YourJwtSecret2026
 ## Demo Credentials
 
 | Role    | Phone Number | Password     |
-|---------|-------------|--------------|
+|---------|--------------|--------------|
 | Doctor  | +15550000001 | doctorpass   |
 | Nurse   | +15550000002 | nursepass    |
 | Admin   | +15550000003 | adminpass    |
 | Patient | +15550000004 | patientpass  |
+| Hospital | +15550000005 | hospitalpass |
+| Laboratory | +15550000006 | labpass   |
+| Insurance | +15550000007 | insurancepass |
 
-> **Staff (Doctor / Nurse / Admin)** can log in and view **any** patient's records by typing the patient ID (e.g. `P-2001`) on the **Records** page — ideal for explaining role-based access control.
+### 22 department doctors
+
+Each of the 22 seeded doctors (phone `+155510010001` … `+155510010022`, password `doctorpass`) has **consented access to their own 5 patients** — the patient-first consent flow.
+
+| Phone Number | Doctor | Department |
+|--------------|--------|-----------|
+| +155510010001 | Dr. Rajesh Varma | Cardiology |
+| +155510010002 | Dr. Sunita Rao | Cardiology |
+| +155510010003 | Dr. Arvind Swaminathan | Neurology |
+| +155510010004 | Dr. Preeti Nair | Neurology |
+| +155510010005 | Dr. Vikramaditya Rathore | Orthopaedics |
+| +155510010006 | Dr. Neha Kulkarni | Orthopaedics |
+| +155510010007 | Dr. Amit Mehra | Pediatrics |
+| +155510010008 | Dr. Shalini Deshmukh | Neonatology |
+| +155510010009 | Dr. Ananya Sen | OB-GYN |
+| +155510010010 | Dr. Ritu Bhargava | OB-GYN |
+| +155510010011 | Dr. Harish Chandra | General Surgery |
+| +155510010012 | Dr. Pooja Joshi | General Surgery |
+| +155510010013 | Dr. Sanjay Nambiar | Internal Medicine |
+| +155510010014 | Dr. Kavita Hegde | Internal Medicine |
+| +155510010015 | Dr. Siddharth Menon | Oncology |
+| +155510010016 | Dr. Maya Pillai | Oncology |
+| +155510010017 | Dr. Tanya Kapoor | Dermatology |
+| +155510010018 | Dr. Rohan Chawla | Dermatology |
+| +155510010019 | Dr. Deepa Natarajan | Radiology |
+| +155510010020 | Dr. Kunal Singhania | Radiology |
+| +155510010021 | Dr. Manish Tandon | Emergency |
+| +155510010022 | Dr. Sneha Patil | Emergency |
+
+> **Consent demo:** Log in as a patient (e.g. `+15552100001` / `patientpass`) → **Records** page. Grant or revoke consent for any provider. A Laboratory user (`+15550000006` / `labpass`) is **blocked** from reading a patient until the patient grants consent — try it.
+>
+> **PoA demo:** Admin can seal pending transactions into a block via `POST /api/mine`. Blocks show the sealed-by validator and signature.
 
 ---
 
@@ -318,12 +352,17 @@ npx expo start
 ```
 Blockchain_framework_for-secure_distributed_healthcare_system/
 ├── server/                 # Node.js + Express backend
-│   ├── index.js            # API routes, file upload, mining
-│   ├── blockchain.js       # Blockchain, Block, AES encryption
+│   ├── index.js            # API routes, file upload, PoA sealing
+│   ├── blockchain.js       # PoA blockchain, Block, validator signing
+│   ├── crypto.js           # Hybrid RSA/AES-256-GCM encryption + keypair
+│   ├── consent.js          # Patient-controlled consent registry (smart contracts)
+│   ├── contracts.js        # Healthcare workflow contract engine
+│   ├── offchain.js         # Off-chain encrypted payload store
 │   ├── auth.js             # JWT auth, role-based access control
-│   ├── contracts.js        # Smart contract engine
 │   ├── db.js               # SQLite for file metadata
 │   ├── notifications.js    # Twilio SMS + file fallback
+│   ├── keys/               # Generated RSA keypair (not committed)
+│   ├── data/offchain/      # Encrypted off-chain payloads (not committed)
 │   └── .env                # Environment config (not committed)
 ├── client/                 # React + Vite frontend
 │   ├── src/
@@ -340,16 +379,17 @@ Blockchain_framework_for-secure_distributed_healthcare_system/
 
 ## Key Features
 
-- **Encrypted Records** — AES encryption for all patient data before blockchain storage
-- **Tamper-Proof Ledger** — SHA-256 hash chain with proof-of-work validation
-- **Smart Contracts** — Healthcare data access agreements with approval/finalization workflows
-- **Role-Based Access** — Doctor, Nurse, Admin, and Patient roles with JWT authentication
-- **File Upload** — Signed download URLs for secure file sharing
+- **Asymmetric (hybrid) Encryption** — AES-256-GCM record encryption with RSA-2048 (OAEP-SHA256) key wrapping
+- **Off-chain Storage, On-chain Proof** — only hashes + metadata live on the ledger; full encrypted payloads live off-chain
+- **Proof-of-Authority Consensus** — blocks are sealed by a rotating set of trusted validators; no energy-heavy mining
+- **Patient-Controlled Consent** — smart-contract enforced, grant/revoke access per provider; revoked instantly blocks reads
+- **Role-Based Access** — Doctor, Nurse, Hospital, Laboratory, Insurance, Admin, and Patient roles with JWT authentication
+- **File Upload** — Signed download URLs for secure file sharing with consent-aware access
 - **SMS Notifications** — Twilio integration with local file fallback
 - **PWA Support** — Installable web app with service worker caching
 - **Mobile App** — React Native/Expo app with same API integration
-- **Block Explorer** — Visual inspection of the blockchain ledger
-- **Audit Trail** — Complete history of all record changes and contract actions
+- **Block Explorer** — Visual inspection of PoA-sealed blocks and validator signatures
+- **Audit Trail** — Complete history of all record changes, consent actions, and contract actions
 
 ---
 
@@ -375,14 +415,18 @@ npm run docker-up
 |--------|----------|------|-------------|
 | POST | `/api/auth/login` | No | Login with phone + password |
 | POST | `/api/auth/register` | No | Register new patient |
-| GET | `/api/status` | No | Blockchain status |
-| GET | `/api/ledger` | Yes | Full blockchain ledger |
-| GET | `/api/records?patientId=P-2001` | Yes | Patient records |
-| POST | `/api/records` | Doctor/Nurse/Admin | Add record transaction |
-| POST | `/api/files/upload` | Doctor/Nurse/Admin | Upload file + notify patient |
+| GET | `/api/status` | No | Blockchain status (consensus, validators, validity) |
+| GET | `/api/crypto/public-key` | No | Network RSA-2048 public key (key-wrapping) |
+| GET | `/api/ledger` | Yes | Full PoA blockchain ledger |
+| GET | `/api/consent` | Yes | List consents for a patient |
+| POST | `/api/consent` | Patient | Patient grants consent to a provider |
+| DELETE | `/api/consent` | Patient | Patient revokes consent |
+| GET | `/api/records?patientId=P-2001` | Yes | Patient records (consent-gated) |
+| POST | `/api/records` | Staff | Add record transaction |
+| POST | `/api/files/upload` | Staff | Upload file + notify patient |
 | GET | `/api/files/:filename` | Yes / Signed URL | Download file |
-| POST | `/api/mine` | Admin | Mine pending transactions |
-| GET | `/api/validate` | Yes | Validate chain integrity |
+| POST | `/api/mine` | Admin | Seal pending transactions into a PoA block |
+| GET | `/api/validate` | Yes | Validate chain integrity + validator set |
 | GET | `/api/contracts` | Yes | List smart contracts |
 | POST | `/api/contracts` | Admin | Create contract |
 | POST | `/api/contracts/:id/execute` | Doctor/Admin | Execute contract action |

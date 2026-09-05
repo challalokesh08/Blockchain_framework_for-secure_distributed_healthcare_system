@@ -62,6 +62,11 @@ node seed-records.js
 | Doctor | +15550000001 | doctorpass |
 | Nurse | +15550000002 | nursepass |
 | Patient | +15550000004 | patientpass |
+| Hospital | +15550000005 | hospitalpass |
+| Laboratory | +15550000006 | labpass |
+| Insurance | +15550000007 | insurancepass |
+
+Each of the 22 department doctors also has an account (phones `+155510010001`…`+155510010022`, password `doctorpass`) with consent-gated access to their own patients.
 
 ## Viewing Records
 
@@ -84,8 +89,8 @@ Each record contains:
 ## For Presentations
 
 These sample records are designed to demonstrate:
-1. **Encrypted Patient Records**: All data is AES-encrypted before blockchain storage
-2. **Tamper-Proof Ledger**: SHA-256 hash chain with proof-of-work validation
-3. **Role-Based Access Control**: Different access levels for doctors, nurses, admins, and patients
-4. **Comprehensive Medical Data**: Realistic diagnoses across all hospital departments
+1. **Asymmetric (hybrid) Encryption**: AES-256-GCM records wrapped with RSA-2048 keys before off-chain storage
+2. **Tamper-Proof PoA Ledger**: SHA-256 hash chain sealed by Proof-of-Authority validators
+3. **Patient-Controlled Consent**: grant/revoke access per provider; denied providers are blocked instantly
+4. **Role-Based Access Control**: doctors, hospitals, laboratories, insurers, nurses, admins, and patients
 5. **Audit Trail**: Complete history of all record changes stored on the blockchain

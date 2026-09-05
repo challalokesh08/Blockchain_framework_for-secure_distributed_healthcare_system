@@ -3,12 +3,33 @@ const bcrypt = require('bcryptjs');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'HealthcareJwtSecret2026!';
 
+const STAFF_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory', 'Insurance'];
+
 const users = [
   { username: 'doctor1', password: bcrypt.hashSync('doctorpass', 10), role: 'Doctor', name: 'Dr. Sharma', phone: '+15550000001', age: 45 },
   { username: 'nurse1', password: bcrypt.hashSync('nursepass', 10), role: 'Nurse', name: 'Nurse Patel', phone: '+15550000002', age: 32 },
   { username: 'admin1', password: bcrypt.hashSync('adminpass', 10), role: 'Admin', name: 'Administrator', phone: '+15550000003', age: 38 },
-  { username: 'patient1', password: bcrypt.hashSync('patientpass', 10), role: 'Patient', name: 'Asha Kumar', patientId: 'P-1001', phone: '+15550000004', age: 29 }
+  { username: 'patient1', password: bcrypt.hashSync('patientpass', 10), role: 'Patient', name: 'Asha Kumar', patientId: 'P-1001', phone: '+15550000004', age: 29 },
+  { username: 'hospital1', password: bcrypt.hashSync('hospitalpass', 10), role: 'Hospital', name: 'City General Hospital', phone: '+15550000005', age: 0, organization: 'City General Hospital' },
+  { username: 'lab1', password: bcrypt.hashSync('labpass', 10), role: 'Laboratory', name: 'Metropolis Diagnostics Lab', phone: '+15550000006', age: 0, organization: 'Metropolis Diagnostics Lab' },
+  { username: 'insurance1', password: bcrypt.hashSync('insurancepass', 10), role: 'Insurance', name: 'InsureHealth Insurance', phone: '+15550000007', age: 0, organization: 'InsureHealth Insurance' }
 ];
+
+let doctorSeq = 10000;
+
+function seedDoctor({ name, phone }) {
+  if (users.find(u => u.name.toLowerCase() === name.toLowerCase())) return null;
+  const user = {
+    username: `doctor_${++doctorSeq}`,
+    password: bcrypt.hashSync('doctorpass', 10),
+    role: 'Doctor',
+    name,
+    phone: phone || '+15550010001',
+    age: 45
+  };
+  users.push(user);
+  return user;
+}
 
 function findUser(username) {
   return users.find(user => user.username === username);
@@ -110,5 +131,7 @@ module.exports = {
   authorizeRoles,
   createPatientUser,
   getAllPatients,
-  seedPatient
+  seedPatient,
+  seedDoctor,
+  STAFF_ROLES
 };

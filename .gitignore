@@ -1,12 +1,15 @@
 node_modules
 client/node_modules
 server/node_modules
+mobile/.expo/
 .DS_Store
 .env
 server/.env
 server/data.db
 server/uploads/
 server/notifications/
+server/keys/
+server/data/
 client/dist/
 client/dist
 generated-images/

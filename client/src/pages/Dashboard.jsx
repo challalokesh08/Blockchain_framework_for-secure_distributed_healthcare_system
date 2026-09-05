@@ -18,13 +18,28 @@ function Dashboard() {
     ],
     Admin: [
       { title: 'Governance & compliance', description: 'Manage contracts, review audit logs, and configure access workflows.' },
-      { title: 'Network validation', description: 'Mine ledger blocks and maintain a validated healthcare blockchain environment.' },
+      { title: 'PoA network validation', description: 'Seal ledger blocks as a Proof-of-Authority validator and maintain a validated healthcare blockchain.' },
       { title: 'Enterprise controls', description: 'Oversee staff roles, patient privacy, and secure distributed data access.' }
+    ],
+    Hospital: [
+      { title: 'Hospital operations', description: 'Coordinate care across departments with consent-based access to patient records.' },
+      { title: 'Consent governance', description: 'Access is patient-controlled; view records only for patients who authorized your organization.' },
+      { title: 'Audit readiness', description: 'Every access is sealed into the PoA ledger under an immutable audit trail.' }
+    ],
+    Laboratory: [
+      { title: 'Test result sharing', description: 'Upload lab reports securely and share results with patient-controlled consent.' },
+      { title: 'Consent-gated access', description: 'Patients unlock your access by granting explicit consent for result sharing.' },
+      { title: 'Immutable records', description: 'Lab transactions are hashed on-chain and secured by PoA validators.' }
+    ],
+    Insurance: [
+      { title: 'Claim verification', description: 'Verify healthcare records on-chain for faster, tamper-proof claim processing.' },
+      { title: 'Patient authorization', description: 'Access medical histories only when the patient grants consent for claims.' },
+      { title: 'Fraud reduction', description: 'Immutable audit trails reduce records misrepresentation and fraud.' }
     ],
     Patient: [
       { title: 'Personal health view', description: 'Review your protected medical history and encrypted record metadata.' },
       { title: 'Data privacy first', description: 'Your health data stays encrypted and accessible only through secure authentication.' },
-      { title: 'Trusted access', description: 'See the same audit-ready ledger technology your care team uses for security.' }
+      { title: 'Consent control', description: 'You decide who can access your records — grant or revoke access anytime.' }
     ]
   };
 

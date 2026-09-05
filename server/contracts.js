@@ -1,5 +1,3 @@
-const { PatientRecordTransaction } = require('./blockchain');
-
 const allowedActions = {
   approveAccess: (contract, executor) => {
     if (contract.status !== 'PENDING') {
@@ -55,15 +53,15 @@ class ContractEngine {
 
     handler(contract, executor);
     if (contract.status === 'COMPLETED') {
-      this.blockchain.addTransaction(new PatientRecordTransaction(
-        contract.details.patientId,
-        executor.name,
-        {
+      this.blockchain.addTransaction({
+        patientId: contract.details.patientId,
+        author: executor.name,
+        data: {
           contractId: contract.contractId,
           event: 'Contract finalized',
           purpose: contract.details.purpose
         }
-      ));
+      });
     }
 
     return contract;

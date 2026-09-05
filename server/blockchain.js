@@ -1,86 +1,127 @@
-const CryptoJS = require('crypto-js');
-const { createHash } = require('crypto');
+const crypto = require('crypto');
+const { encrypt, decrypt, sha256 } = require('./crypto');
+const offchain = require('./offchain');
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'HealthcareSecureNetwork2026!';
+const VALIDATORS = [
+  'VALIDATOR-CARE-NODE-A',
+  'VALIDATOR-CARE-NODE-B',
+  'VALIDATOR-LAB-NODE',
+  'VALIDATOR-INSURANCE-NODE',
+  'VALIDATOR-HOSPITAL-NODE'
+];
+
+const VALIDATOR_SECRET = process.env.VALIDATOR_SECRET || 'ProofOfAuthorityHealthcareSigningKey2026';
+
+function roleForValidator(validator) {
+  if (validator.includes('LAB')) return 'Laboratory';
+  if (validator.includes('INSURANCE')) return 'Insurance';
+  if (validator.includes('HOSPITAL')) return 'Hospital';
+  return 'Doctor';
+}
 
 class PatientRecordTransaction {
-  constructor(patientId, author, data) {
+  constructor({ patientId, author, contentType, dataHash, dataRef }) {
     this.patientId = patientId;
     this.author = author;
-    this.data = data;
+    this.contentType = contentType || 'record';
+    this.dataHash = dataHash;
+    this.dataRef = dataRef || `offchain:${dataHash}`;
     this.timestamp = new Date().toISOString();
   }
 }
 
 class Block {
-  constructor(timestamp, transactions, previousHash = '') {
+  constructor(timestamp, transactions, previousHash = '', validator = '') {
     this.previousHash = previousHash;
     this.timestamp = timestamp;
     this.transactions = transactions;
-    this.nonce = 0;
+    this.validator = validator;
+    this.signature = '';
     this.hash = this.computeHash();
   }
 
   computeHash() {
-    return createHash('sha256')
-      .update(this.previousHash + this.timestamp + JSON.stringify(this.transactions) + this.nonce)
-      .digest('hex');
+    return sha256(
+      this.previousHash + this.timestamp + JSON.stringify(this.transactions) + this.validator + this.signature
+    );
   }
 
-  mineBlock(difficulty) {
-    while (this.hash.substring(0, difficulty) !== '0'.repeat(difficulty)) {
-      this.nonce += 1;
-      this.hash = this.computeHash();
-    }
+  sign(validator) {
+    this.validator = validator;
+    this.signature = crypto
+      .createHmac('sha256', VALIDATOR_SECRET)
+      .update(this.previousHash + this.timestamp + JSON.stringify(this.transactions) + validator)
+      .digest('hex');
+    this.hash = this.computeHash();
+    return this;
+  }
+
+  verifySignature() {
+    if (!this.signature || !this.validator) return false;
+    const expected = crypto
+      .createHmac('sha256', VALIDATOR_SECRET)
+      .update(this.previousHash + this.timestamp + JSON.stringify(this.transactions) + this.validator)
+      .digest('hex');
+    return expected === this.signature;
   }
 }
 
 class Blockchain {
   constructor() {
     this.chain = [this.createGenesisBlock()];
-    this.difficulty = 3;
     this.pendingTransactions = [];
-    this.records = [];
+    this.validatorIndex = 0;
   }
 
   createGenesisBlock() {
-    return new Block(new Date().toISOString(), [{ message: 'Genesis block for Healthcare Ledger' }], '0');
+    return new Block(new Date().toISOString(), [{ message: 'Genesis block for Healthcare Ledger' }], '0', 'VALIDATOR-GENESIS');
   }
 
   getLatestBlock() {
     return this.chain[this.chain.length - 1];
   }
 
-  addTransaction(transaction) {
-    if (!transaction.patientId || !transaction.author || !transaction.data) {
+  addTransaction({ patientId, author, data, contentType }) {
+    if (!patientId || !author || data === undefined || data === null) {
       throw new Error('Invalid transaction: missing required fields.');
     }
 
-    const encryptedPayload = this.encryptData(JSON.stringify(transaction.data));
-    const storedTransaction = new PatientRecordTransaction(
-      transaction.patientId,
-      transaction.author,
-      encryptedPayload
-    );
+    const plain = JSON.stringify(data);
+    const dataHash = sha256(plain);
 
-    this.pendingTransactions.push(storedTransaction);
-    return storedTransaction;
+    const encryptedPayload = encrypt(plain);
+    offchain.save(dataHash, { ciphertext: encryptedPayload });
+
+    const txn = new PatientRecordTransaction({ patientId, author, dataHash, contentType });
+    this.pendingTransactions.push(txn);
+    return txn;
   }
 
-  minePendingTransactions(minerAddress) {
+  finalizeBlock(validatorName) {
     if (this.pendingTransactions.length === 0) {
       return null;
     }
 
-    const block = new Block(new Date().toISOString(), this.pendingTransactions, this.getLatestBlock().hash);
-    block.mineBlock(this.difficulty);
+    const validator = this.resolveValidator(validatorName);
+    const block = new Block(
+      new Date().toISOString(),
+      this.pendingTransactions,
+      this.getLatestBlock().hash,
+      validator
+    );
+    block.sign(validator);
 
     this.chain.push(block);
     this.pendingTransactions = [];
-
-    const rewardTransaction = new PatientRecordTransaction(minerAddress, 'System', { reward: 'Healthcare ledger validation completed' });
-    this.pendingTransactions.push(rewardTransaction);
+    this.validatorIndex = (this.validatorIndex + 1) % VALIDATORS.length;
     return block;
+  }
+
+  resolveValidator(name) {
+    if (name && VALIDATORS.some(v => v.toLowerCase() === String(name).toLowerCase())) {
+      return name;
+    }
+    return VALIDATORS[this.validatorIndex % VALIDATORS.length];
   }
 
   getPatientRecords(patientId) {
@@ -88,32 +129,50 @@ class Blockchain {
     for (const block of this.chain) {
       for (const transaction of block.transactions) {
         if (transaction.patientId === patientId) {
-          const decrypted = this.decryptData(transaction.data);
-          records.push({
-            patientId: transaction.patientId,
-            author: transaction.author,
-            timestamp: transaction.timestamp,
-            data: decrypted,
-            hash: block.hash,
-            previousHash: block.previousHash
-          });
+          records.push(this.resolveRecord(transaction, block));
         }
       }
     }
     return records;
   }
 
-  encryptData(data) {
-    return CryptoJS.AES.encrypt(data, ENCRYPTION_KEY).toString();
-  }
+  resolveRecord(transaction, block) {
+    const base = {
+      patientId: transaction.patientId,
+      author: transaction.author,
+      contentType: transaction.contentType,
+      dataHash: transaction.dataHash,
+      dataRef: transaction.dataRef,
+      timestamp: transaction.timestamp,
+      hash: block.hash,
+      previousHash: block.previousHash,
+      validator: block.validator
+    };
 
-  decryptData(cipherText) {
-    try {
-      const bytes = CryptoJS.AES.decrypt(cipherText, ENCRYPTION_KEY);
-      return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-    } catch (error) {
-      return { error: 'Unable to decrypt data' };
+    const stored = offchain.get(transaction.dataHash);
+    if (!stored || !stored.ciphertext) {
+      return { ...base, data: { error: 'Off-chain payload unavailable for this record.' } };
     }
+
+    let decrypted;
+    try {
+      decrypted = decrypt(stored.ciphertext);
+    } catch (err) {
+      return { ...base, data: { error: 'Unable to decrypt off-chain payload: ' + err.message } };
+    }
+
+    if (sha256(decrypted) !== transaction.dataHash) {
+      return { ...base, data: { error: 'Off-chain payload hash mismatch — integrity check failed.' } };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(decrypted);
+    } catch (err) {
+      return { ...base, data: { error: 'Decrypted payload is not valid JSON.' } };
+    }
+
+    return { ...base, data };
   }
 
   isChainValid() {
@@ -128,9 +187,24 @@ class Blockchain {
       if (currentBlock.previousHash !== previousBlock.hash) {
         return false;
       }
+
+      if (!currentBlock.verifySignature()) {
+        return false;
+      }
     }
     return true;
   }
+
+  getStatus() {
+    return {
+      consensus: 'Proof-of-Authority (PoA)',
+      validators: VALIDATORS.length,
+      validatorRotation: VALIDATORS[this.validatorIndex % VALIDATORS.length],
+      blocks: this.chain.length,
+      pendingTransactions: this.pendingTransactions.length,
+      valid: this.isChainValid()
+    };
+  }
 }
 
-module.exports = { Blockchain, PatientRecordTransaction };
+module.exports = { Blockchain, PatientRecordTransaction, VALIDATORS, roleForValidator };
