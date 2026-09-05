@@ -61,9 +61,12 @@ Deploy `server/` to one of these platforms:
 
 ```
 PORT=4000
-ENCRYPTION_KEY=YourStrongHealthcareEncryptionKey2026
 JWT_SECRET=YourJwtSecret2026
+VALIDATOR_SECRET=YourStrongPoAValidatorSealingKey2026
 ```
+
+- The RSA keypair used for encryption is **generated automatically** at first boot in `server/keys/` — no `ENCRYPTION_KEY` needed anymore.
+- Optional: `DOWNLOAD_URL_EXPIRY` (signed download-link lifetime in seconds, default 86400) and `TWILIO_SID`/`TWILIO_TOKEN`/`TWILIO_FROM` for SMS (skip for local demo — notifications fall back to `server/notifications/`).
 
 ---
 
@@ -342,8 +345,10 @@ npx expo start
 | Screen | Visible to | What it does |
 |--------|-----------|--------------|
 | **My Records** | All (Patient + Staff) | Shows the logged-in user's own records |
-| **View Patient Records** | Doctor / Nurse / Admin only | Search **any** patient ID and see their records + files |
-| **Upload File** | Doctor / Nurse / Admin only | Upload a medical file for a patient |
+| **View Patient Records** | All staff roles (Doctor / Nurse / Admin / Hospital / Laboratory / Insurance) | Search **any** patient ID and see their records + files |
+| **Upload File** | Doctor / Nurse / Admin / Hospital / Laboratory | Upload a medical file for a patient |
+
+> All record and file reads are **consent-gated**: a staff member can only see a patient's data if that patient has granted them (or their organisation) consent — Insurance is read-only.
 
 ---
 
