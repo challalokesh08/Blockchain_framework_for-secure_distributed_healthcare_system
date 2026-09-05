@@ -50,42 +50,45 @@ const STAFF_OR_PATIENT = [...STAFF_ROLES, 'Patient'];
 const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
 
 // Seed 110 patients + medical records + image files + doctors + consents on startup so data persists across redeploys
-try {
-  const dataset = require('../dataset');
-  const seedImageDir = path.join(__dirname, 'seed-images');
-  let seeded = 0;
-  let seededFiles = 0;
-  let seededDoctors = 0;
+(async () => {
+  try {
+    const dataset = require('../dataset');
+    const seedImageDir = path.join(__dirname, 'seed-images');
+    let seeded = 0;
+    let seededFiles = 0;
+    let seededDoctors = 0;
 
-  const uniqueDoctors = [];
-  const seenDoctors = new Set();
-  for (const p of dataset) {
-    if (!seenDoctors.has(p.doctor)) {
-      seenDoctors.add(p.doctor);
-      uniqueDoctors.push(p.doctor);
+    const uniqueDoctors = [];
+    const seenDoctors = new Set();
+    for (const p of dataset) {
+      if (!seenDoctors.has(p.doctor)) {
+        seenDoctors.add(p.doctor);
+        uniqueDoctors.push(p.doctor);
+      }
     }
-  }
-  uniqueDoctors.forEach((doctorName, i) => {
-    if (seedDoctor({ name: doctorName, phone: `+1555${String(10010001 + i)}` })) {
-      seededDoctors++;
-    }
-  });
+    uniqueDoctors.forEach((doctorName, i) => {
+      if (seedDoctor({ name: doctorName, phone: `+1555${String(10010001 + i)}` })) {
+        seededDoctors++;
+      }
+    });
 
-  for (const p of dataset) {
-    const user = seedPatient({ patientId: p.patientId, name: p.name, age: p.age, phone: p.phone });
-    if (user) {
-      seeded++;
-      ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { diagnosis: p.diagnosis, notes: p.news, department: p.department, physician: p.doctor } });
-      consentRegistry.grant({ patientId: p.patientId, providerName: p.doctor, providerType: 'Doctor', purpose: 'Primary care coordination', requester: { name: 'System (seed)' } });
-      consentRegistry.grant({ patientId: p.patientId, providerName: 'City General Hospital', providerType: 'Hospital', purpose: 'Hospital care operations', requester: { name: 'System (seed)' } });
-    }
+    for (const p of dataset) {
+      const user = seedPatient({ patientId: p.patientId, name: p.name, age: p.age, phone: p.phone });
+      if (user) {
+        seeded++;
+        ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { diagnosis: p.diagnosis, notes: p.news, department: p.department, physician: p.doctor } });
+        consentRegistry.grant({ patientId: p.patientId, providerName: p.doctor, providerType: 'Doctor', purpose: 'Primary care coordination', requester: { name: 'System (seed)' } });
+        consentRegistry.grant({ patientId: p.patientId, providerName: 'City General Hospital', providerType: 'Hospital', purpose: 'Hospital care operations', requester: { name: 'System (seed)' } });
+      }
 
-    const src = path.join(seedImageDir, `${p.patientId}.png`);
-    if (fs.existsSync(src)) {
-      const storedName = `seed-${p.patientId}.png`;
-      const dest = path.join(uploadDir, storedName);
-      if (!fs.existsSync(dest)) {
-        fs.copyFileSync(src, dest);
+      const src = path.join(seedImageDir, `${p.patientId}.png`);
+      if (fs.existsSync(src)) {
+        const storedName = `seed-${p.patientId}.png`;
+        const dest = path.join(uploadDir, storedName);
+        if (!fs.existsSync(dest)) {
+          fs.copyFileSync(src, dest);
+          seededFiles++;
+        }
         const st = fs.statSync(dest);
         const meta = {
           patientId: p.patientId,
@@ -96,19 +99,21 @@ try {
           size: st.size,
           timestamp: new Date().toISOString()
         };
-        saveFileMeta(db, meta).catch(err => console.error('seed saveFileMeta error', err));
-        ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { file: { originalname: meta.originalname, filename: meta.filename, mimetype: meta.mimetype, size: meta.size } } });
-        seededFiles++;
+        const existing = await getFileMeta(db, storedName);
+        if (!existing) {
+          await saveFileMeta(db, meta);
+          ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { file: { originalname: meta.originalname, filename: meta.filename, mimetype: meta.mimetype, size: meta.size } } });
+        }
       }
     }
+    if (seeded > 0) {
+      ledger.finalizeBlock('VALIDATOR-CARE-NODE-A');
+      console.log(`Seeded ${seeded} patients, medical records, ${seededFiles} image files, ${seededDoctors} doctors, and consents on startup`);
+    }
+  } catch (err) {
+    console.error('Seed failed (non-fatal):', err.message);
   }
-  if (seeded > 0) {
-    ledger.finalizeBlock('VALIDATOR-CARE-NODE-A');
-    console.log(`Seeded ${seeded} patients, medical records, ${seededFiles} image files, ${seededDoctors} doctors, and consents on startup`);
-  }
-} catch (err) {
-  console.error('Seed failed (non-fatal):', err.message);
-}
+})();
 
 app.use(cors());
 app.use(express.json());
