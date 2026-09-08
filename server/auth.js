@@ -1,9 +1,16 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { saveUser, loadUsers } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'HealthcareJwtSecret2026!';
 
 const STAFF_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory', 'Insurance'];
+
+let dbRef = null;
+
+function setDb(db) {
+  dbRef = db;
+}
 
 const users = [
   { username: 'doctor1', password: bcrypt.hashSync('doctorpass', 10), role: 'Doctor', name: 'Dr. Sharma', phone: '+15550000001', age: 45 },
@@ -50,10 +57,21 @@ function verifyPassword(user, rawPassword) {
   return bcrypt.compareSync(rawPassword, user.password);
 }
 
+function nextPatientId() {
+  let maxNum = 3000;
+  for (const u of users) {
+    if (u.patientId && /^P-(\d+)$/.test(u.patientId)) {
+      const n = parseInt(u.patientId.slice(2), 10);
+      if (n > maxNum) maxNum = n;
+    }
+  }
+  return `P-${maxNum + 1}`;
+}
+
 function createPatientUser(details) {
   const nextId = users.filter(u => u.role === 'Patient').length + 2;
   const username = `patient${nextId}`;
-  const patientId = details.patientId || `P-${1000 + nextId}`;
+  const patientId = nextPatientId();
   const user = {
     username,
     password: bcrypt.hashSync(details.password, 10),
@@ -64,7 +82,36 @@ function createPatientUser(details) {
     patientId
   };
   users.push(user);
+  if (dbRef) {
+    saveUser(dbRef, user).catch(err => console.error('[auth] failed to persist user:', err.message));
+  }
   return user;
+}
+
+async function loadPersistedUsers() {
+  if (!dbRef) return 0;
+  try {
+    const rows = await loadUsers(dbRef);
+    let added = 0;
+    for (const row of rows) {
+      if (users.some(u => u.phone === row.phone)) continue;
+      if (users.some(u => u.username === row.username)) continue;
+      users.push({
+        username: row.username,
+        password: row.password,
+        role: row.role,
+        name: row.name,
+        age: row.age,
+        phone: row.phone,
+        patientId: row.patientId || null
+      });
+      added++;
+    }
+    return added;
+  } catch (err) {
+    console.error('[auth] failed to load persisted users:', err.message);
+    return 0;
+  }
 }
 
 function seedPatient(details) {
@@ -130,6 +177,8 @@ module.exports = {
   authenticateToken,
   authorizeRoles,
   createPatientUser,
+  loadPersistedUsers,
+  setDb,
   getAllPatients,
   seedPatient,
   seedDoctor,

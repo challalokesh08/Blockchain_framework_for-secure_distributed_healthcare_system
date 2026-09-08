@@ -18,6 +18,15 @@ function init() {
       size INTEGER,
       timestamp TEXT
     )`);
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+      username TEXT PRIMARY KEY,
+      password TEXT,
+      role TEXT,
+      name TEXT,
+      age INTEGER,
+      phone TEXT,
+      patientId TEXT
+    )`);
   });
 
   return db;
@@ -52,4 +61,24 @@ function listFilesForPatient(db, patientId) {
   });
 }
 
-module.exports = { init, saveFileMeta, getFileMeta, listFilesForPatient };
+function saveUser(db, user) {
+  return new Promise((resolve, reject) => {
+    const stmt = db.prepare(`INSERT OR REPLACE INTO users (username, password, role, name, age, phone, patientId) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    stmt.run(user.username, user.password, user.role, user.name, user.age, user.phone, user.patientId || null, function (err) {
+      stmt.finalize();
+      if (err) return reject(err);
+      resolve(true);
+    });
+  });
+}
+
+function loadUsers(db) {
+  return new Promise((resolve, reject) => {
+    db.all(`SELECT * FROM users ORDER BY rowid ASC`, [], (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows || []);
+    });
+  });
+}
+
+module.exports = { init, saveFileMeta, getFileMeta, listFilesForPatient, saveUser, loadUsers };

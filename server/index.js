@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const jsonwebtoken = require('jsonwebtoken');
 const { Blockchain, PatientRecordTransaction, VALIDATORS, roleForValidator } = require('./blockchain');
-const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients, seedPatient, seedDoctor, STAFF_ROLES } = require('./auth');
+const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients, seedPatient, seedDoctor, loadPersistedUsers, setDb, STAFF_ROLES } = require('./auth');
 const { getUserByPatientId } = require('./auth');
 const { sendSMS } = require('./notifications');
 const multer = require('multer');
@@ -22,6 +22,7 @@ const upload = multer({ storage });
 // initialize sqlite DB for file metadata
 const { init: initDb, saveFileMeta, getFileMeta, listFilesForPatient } = require('./db');
 const db = initDb();
+setDb(db);
 
 // migrate old metadata.json into sqlite (if present)
 const metadataFile = path.join(__dirname, 'uploads', 'metadata.json');
@@ -52,6 +53,8 @@ const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
 // Seed 110 patients + medical records + image files + doctors + consents on startup so data persists across redeploys
 (async () => {
   try {
+    const restoredUsers = await loadPersistedUsers();
+    if (restoredUsers > 0) console.log(`Restored ${restoredUsers} previously registered user(s) from sqlite.`);
     const dataset = require('../dataset');
     const seedImageDir = path.join(__dirname, 'seed-images');
     let seeded = 0;
@@ -140,9 +143,12 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.post('/api/auth/register', (req, res) => {
-  const { name, age, phone, password, patientId } = req.body;
+  const { name, age, phone, password } = req.body;
   if (!name || age === undefined || age === null || !phone || !password) {
     return res.status(400).json({ error: 'Name, age, phone number, and password are required for registration.' });
+  }
+  if (typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
   }
 
   const normalizedPhone = String(phone).trim();
@@ -150,7 +156,7 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(409).json({ error: 'Phone number is already registered.' });
   }
 
-  const user = createPatientUser({ name, age, phone: normalizedPhone, password, patientId });
+  const user = createPatientUser({ name, age, phone: normalizedPhone, password });
   const token = generateToken(user);
   res.status(201).json({ token, user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone } });
 });
