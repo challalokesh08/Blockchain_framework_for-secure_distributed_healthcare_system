@@ -256,6 +256,50 @@ app.post('/api/records', authenticateToken, authorizeRoles(...WRITE_ROLES), (req
   }
 });
 
+// Add a clinical record with an optional report photo and lab, in one multipart submission.
+app.post('/api/records/with-report', authenticateToken, authorizeRoles(...WRITE_ROLES), upload.single('file'), async (req, res) => {
+  const { patientId, author, diagnosis, notes, lab } = req.body;
+  if (!patientId || !author) {
+    if (req.file && req.file.path) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: 'patientId and author are required.' });
+  }
+
+  try {
+    const recordData = { diagnosis: diagnosis || '', notes: notes || '', lab: lab || '' };
+    const recordTx = ledger.addTransaction({ patientId, author, data: recordData });
+
+    let fileTx = null;
+    if (req.file) {
+      const meta = {
+        patientId,
+        originalname: req.file.originalname,
+        filename: req.file.filename,
+        path: req.file.path,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        timestamp: new Date().toISOString()
+      };
+      await saveFileMeta(db, meta);
+      fileTx = ledger.addTransaction({ patientId, author, data: { file: { originalname: meta.originalname, filename: meta.filename, mimetype: meta.mimetype, size: meta.size } } });
+    }
+
+    const patientUser = getUserByPatientId(patientId);
+    if (patientUser && patientUser.phone) {
+      const message = `New medical record${req.file ? ' with report photo' : ''} uploaded for you by ${author}. Log in to HealthLedger to view it.`;
+      sendSMS(patientUser.phone, message).catch(() => {});
+    }
+
+    res.status(201).json({
+      message: req.file ? 'Record and report photo added to the ledger pool.' : 'Record added to the ledger pool.',
+      recordTransaction: recordTx,
+      fileTransaction: fileTx
+    });
+  } catch (error) {
+    if (req.file && req.file.path) fs.unlinkSync(req.file.path);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Upload file endpoint for healthcare stakeholders. Stores file and creates a ledger transaction with file metadata.
 app.post('/api/files/upload', authenticateToken, authorizeRoles(...WRITE_ROLES), upload.single('file'), (req, res) => {
   const { patientId, author } = req.body;

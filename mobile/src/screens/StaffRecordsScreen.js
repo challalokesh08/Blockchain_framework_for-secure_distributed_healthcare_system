@@ -87,6 +87,7 @@ export default function StaffRecordsScreen() {
                       {r.data?.department ? <Text style={s.text}>Department: {r.data.department}</Text> : null}
                       {r.data?.diagnosis ? <Text style={s.text}>Diagnosis: {r.data.diagnosis}</Text> : null}
                       {r.data?.physician ? <Text style={s.text}>Physician: {r.data.physician}</Text> : null}
+                      {r.data?.lab ? <Text style={s.text}>Lab: {r.data.lab}</Text> : null}
                       {r.data?.notes ? <Text style={s.text}>Notes: {r.data.notes}</Text> : null}
                       <Text style={s.hash}>Block: {r.hash?.substring(0, 16)}...</Text>
                     </View>

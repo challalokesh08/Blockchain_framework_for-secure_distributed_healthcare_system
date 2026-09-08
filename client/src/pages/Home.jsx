@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api.js';
+import { AuthContext } from '../AuthContext.jsx';
 
 function Home() {
+  const { isAuthenticated } = useContext(AuthContext);
   const [status, setStatus] = useState(null);
 
   useEffect(() => {
@@ -21,7 +23,8 @@ function Home() {
             <p>HealthLedger connects doctors, hospitals, laboratories, insurers, and patients with encrypted records, patient-controlled consent, and a Proof-of-Authority blockchain.</p>
             <div className="hero-actions">
               <Link className="button primary" to="/features">Discover Features</Link>
-              <Link className="button secondary" to="/login">Sign In</Link>
+              {!isAuthenticated && <Link className="button secondary" to="/login">Sign In</Link>}
+              {isAuthenticated && <Link className="button secondary" to="/records">My Records</Link>}
             </div>
           </div>
           <div className="hero-panel">

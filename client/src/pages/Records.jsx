@@ -19,7 +19,9 @@ function Records() {
   const [consents, setConsents] = useState([]);
   const [consentForm, setConsentForm] = useState({ providerName: '', providerType: 'Doctor', purpose: 'Healthcare data access' });
   const [consentMessage, setConsentMessage] = useState('');
-  const [form, setForm] = useState({ patientId: '', author: '', diagnosis: '', notes: '' });
+  const [form, setForm] = useState({ patientId: '', author: '', diagnosis: '', notes: '', lab: '' });
+  const [reportPhoto, setReportPhoto] = useState(null);
+  const [reportPhotoPreview, setReportPhotoPreview] = useState('');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -81,14 +83,36 @@ function Records() {
   const submitRecord = async (event) => {
     event.preventDefault();
     const targetPid = form.patientId || selectedPatientId;
-    const payload = { patientId: targetPid, author: form.author, data: { diagnosis: form.diagnosis, notes: form.notes } };
+    const fd = new FormData();
+    fd.append('patientId', targetPid);
+    fd.append('author', form.author);
+    fd.append('diagnosis', form.diagnosis);
+    fd.append('notes', form.notes);
+    fd.append('lab', form.lab);
+    if (reportPhoto) fd.append('file', reportPhoto);
     try {
-      const response = await api.post('/api/records', payload);
+      const response = await api.post('/api/records/with-report', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
       setMessage(response.data.message);
-      setForm({ patientId: '', author: '', diagnosis: '', notes: '' });
+      setForm({ patientId: '', author: '', diagnosis: '', notes: '', lab: '' });
+      setReportPhoto(null);
+      setReportPhotoPreview('');
       if (targetPid) loadPatientData(targetPid);
     } catch (error) {
       setMessage(error.response?.data?.error || 'Submission failed');
+    }
+  };
+
+  const handleReportPhoto = (e) => {
+    const f = e.target.files[0];
+    setReportPhoto(f);
+    if (f) {
+      const reader = new FileReader();
+      reader.onload = () => setReportPhotoPreview(reader.result);
+      reader.readAsDataURL(f);
+    } else {
+      setReportPhotoPreview('');
     }
   };
 
@@ -171,6 +195,20 @@ function Records() {
                     Notes
                     <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows="4" />
                   </label>
+                  <label>
+                    Lab / department
+                    <input value={form.lab} onChange={e => setForm({ ...form, lab: e.target.value })} placeholder="e.g. Metropolis Diagnostics Lab" />
+                  </label>
+                  <label>
+                    Report photo (optional)
+                    <input type="file" accept="image/*" onChange={handleReportPhoto} />
+                  </label>
+                  {reportPhotoPreview && (
+                    <div className="report-photo-preview">
+                      <img src={reportPhotoPreview} alt="Selected report preview" />
+                      <p>Attached: {reportPhoto.name}</p>
+                    </div>
+                  )}
                   <button type="submit" className="button primary">Submit record</button>
                   {message && <p className="form-message">{message}</p>}
                 </form>
@@ -242,6 +280,7 @@ function Records() {
                 <p><strong>Department:</strong> {record.data?.department || 'General'}</p>
                 <p><strong>Diagnosis:</strong> {record.data?.diagnosis || 'N/A'}</p>
                 <p><strong>Notes:</strong> {record.data?.notes || 'N/A'}</p>
+                {record.data?.lab && <p><strong>Lab / department:</strong> {record.data.lab}</p>}
                 {record.data?.physician && <p><strong>Physician:</strong> {record.data.physician}</p>}
                 <p className="history-card-hash">Data Hash: {record.dataHash?.substring(0, 32)}… | Sealed by {record.validator}</p>
               </article>
@@ -258,6 +297,7 @@ function Records() {
                       <span>{new Date(f.timestamp).toLocaleString()}</span>
                     </div>
                     <p>Size: {f.size} bytes | Type: {f.mimetype}</p>
+                    {f.mimetype && f.mimetype.startsWith('image/') && <ReportPhoto filename={f.filename} originalname={f.originalname} />}
                     <p><button type="button" className="button secondary" onClick={() => downloadFile(f)}>Download</button></p>
                   </article>
                 ))
@@ -271,3 +311,23 @@ function Records() {
 }
 
 export default Records;
+
+function ReportPhoto({ filename, originalname }) {
+  const [src, setSrc] = useState('');
+  useEffect(() => {
+    let objectUrl = null;
+    api.get(`/api/files/${encodeURIComponent(filename)}`, { responseType: 'blob' })
+      .then(r => {
+        objectUrl = window.URL.createObjectURL(new Blob([r.data]));
+        setSrc(objectUrl);
+      })
+      .catch(() => {});
+    return () => { if (objectUrl) window.URL.revokeObjectURL(objectUrl); };
+  }, [filename]);
+  if (!src) return <p>Loading preview…</p>;
+  return (
+    <div className="report-photo-preview">
+      <img src={src} alt={originalname} />
+    </div>
+  );
+}
