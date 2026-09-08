@@ -56,15 +56,15 @@ node seed-records.js
 
 ## Demo Credentials
 
-| Role | Phone | Password |
-|------|-------|----------|
-| Admin | +15550000003 | adminpass |
-| Doctor | +15550000001 | doctorpass |
-| Nurse | +15550000002 | nursepass |
-| Patient | +15550000004 | patientpass |
-| Hospital | +15550000005 | hospitalpass |
-| Laboratory | +15550000006 | labpass |
-| Insurance | +15550000007 | insurancepass |
+| Role | Name | Phone | Password |
+|------|------|-------|----------|
+| Admin | Administrator | +15550000003 | adminpass |
+| Doctor | Dr. Sharma | +15550000001 | doctorpass |
+| Nurse | Nurse Patel | +15550000002 | nursepass |
+| Patient | Asha Kumar | +15550000004 | patientpass |
+| Hospital | City General Hospital | +15550000005 | hospitalpass |
+| Laboratory | Metropolis Diagnostics Lab | +15550000006 | labpass |
+| Insurance | InsureHealth Insurance | +15550000007 | insurancepass |
 
 Each of the 22 department doctors also has an account (phones `+155510010001`…`+155510010022`, password `doctorpass`) with consent-gated access to their own patients.
 
