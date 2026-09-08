@@ -303,7 +303,7 @@ function Records() {
                     consents.map(c => (
                       <div key={c.consentId} className="consent-row">
                         <div>
-                          <strong>{c.providerName}</strong> ({c.providerType}) — <span>{c.status}</span>
+                          <strong>{c.providerName}</strong> ({c.providerType}) — <span className={`status-pill ${c.status === 'ACTIVE' ? 'success' : c.status === 'REVOKED' ? 'revoked' : 'warning'}`}>{c.status}</span>
                           <p className="consent-purpose">{c.purpose}</p>
                         </div>
                         {c.status === 'ACTIVE' && (

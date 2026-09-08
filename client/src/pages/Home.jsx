@@ -37,7 +37,7 @@ function Home() {
                   <li>Validators: <strong>{status.validators}</strong></li>
                   <li>Blocks: <strong>{status.blocks}</strong></li>
                   <li>Pending items: <strong>{status.pendingTransactions}</strong></li>
-                  <li>Ledger valid: <strong>{status.valid ? 'Yes' : 'No'}</strong></li>
+                  <li>Ledger valid: <strong className={status.valid ? 'text-success' : 'text-danger'}>{status.valid ? 'Yes' : 'No'}</strong></li>
                 </ul>
               ) : (
                 <p>Connecting to API...</p>

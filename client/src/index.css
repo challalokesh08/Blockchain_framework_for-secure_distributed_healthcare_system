@@ -8,10 +8,18 @@
   --surface: rgba(14, 24, 34, 0.95);
   --surface-strong: rgba(18, 32, 47, 0.98);
   --border: rgba(148, 171, 195, 0.12);
-  --primary: #5b8ff9;
-  --primary-soft: rgba(91, 143, 249, 0.18);
-  --accent: #58d9a6;
-  --accent-soft: rgba(88, 217, 166, 0.16);
+  --primary: #6c8cff;
+  --primary-strong: #4a7fff;
+  --primary-soft: rgba(108, 140, 255, 0.18);
+  --accent: #3dd6a8;
+  --accent-soft: rgba(61, 214, 168, 0.16);
+  --signal-teal: #2fbf9f;
+  --success: #3dd6a8;
+  --success-soft: rgba(61, 214, 168, 0.14);
+  --warning: #f0b84b;
+  --warning-soft: rgba(240, 184, 75, 0.12);
+  --danger: #ff7a6b;
+  --danger-soft: rgba(255, 122, 107, 0.14);
   --text-muted: #a7b4c4;
 }
 
@@ -25,8 +33,9 @@ html, body, #root {
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top, rgba(91, 143, 249, 0.12), transparent 30%),
-              radial-gradient(circle at right, rgba(88, 217, 166, 0.08), transparent 22%),
+  background: radial-gradient(circle at top, rgba(108, 140, 255, 0.14), transparent 30%),
+              radial-gradient(circle at right, rgba(61, 214, 168, 0.10), transparent 22%),
+              radial-gradient(circle at left bottom, rgba(47, 191, 159, 0.06), transparent 26%),
               #08101a;
 }
 
@@ -54,8 +63,8 @@ textarea {
 
 input:focus,
 textarea:focus {
-  border-color: rgba(91, 143, 249, 0.45);
-  box-shadow: 0 0 0 4px rgba(91, 143, 249, 0.08);
+  border-color: rgba(108, 140, 255, 0.5);
+  box-shadow: 0 0 0 4px rgba(108, 140, 255, 0.10);
 }
 
 .hero-panel,
@@ -135,9 +144,52 @@ textarea:focus {
   margin: 1rem 0;
   padding: 1rem 1.25rem;
   border-radius: 16px;
-  border: 1px solid rgba(255, 176, 99, 0.35);
-  background: rgba(255, 176, 99, 0.08);
-  color: #ffcf9c;
+  border: 1px solid rgba(240, 184, 75, 0.35);
+  background: rgba(240, 184, 75, 0.09);
+  color: #ffd98f;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.22rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.status-pill.success {
+  color: var(--success);
+  background: var(--success-soft);
+  border: 1px solid rgba(61, 214, 168, 0.35);
+}
+
+.status-pill.revoked,
+.status-pill.danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border: 1px solid rgba(255, 122, 107, 0.35);
+}
+
+.status-pill.warning {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border: 1px solid rgba(240, 184, 75, 0.35);
+}
+
+.status-pill.pending {
+  color: #9db4ff;
+  background: rgba(108, 140, 255, 0.14);
+  border: 1px solid rgba(108, 140, 255, 0.35);
+}
+
+.text-success {
+  color: var(--success);
+}
+
+.text-danger {
+  color: var(--danger);
 }
 
 .consent-panel {
@@ -388,9 +440,10 @@ button, input, textarea {
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #5b8ff9, #58d9a6);
+  background: linear-gradient(135deg, #4a7fff, #2fbf9f);
   font-weight: 700;
   color: white;
+  box-shadow: 0 10px 24px rgba(47, 191, 159, 0.22);
 }
 
 .brand h1 {
@@ -485,8 +538,8 @@ nav {
 
 .primary {
   color: white;
-  background: linear-gradient(135deg, #5b8ff9, #58d9a6);
-  box-shadow: 0 18px 40px rgba(91, 143, 249, 0.2);
+  background: linear-gradient(135deg, #4a7fff 0%, #6c8cff 42%, #3dd6a8 130%);
+  box-shadow: 0 18px 44px rgba(74, 127, 255, 0.28);
 }
 
 .secondary {
@@ -787,13 +840,13 @@ nav {
 }
 
 .patient-row.active {
-  background: rgba(91, 143, 249, 0.18);
-  border-color: var(--accent, #5b8ff9);
+  background: linear-gradient(90deg, rgba(108, 140, 255, 0.22), rgba(61, 214, 168, 0.10));
+  border-color: rgba(108, 140, 255, 0.55);
 }
 
 .patient-row-id {
   font-weight: 700;
-  color: var(--accent, #5b8ff9);
+  color: #9db4ff;
   font-size: 0.92rem;
   min-width: 64px;
 }
