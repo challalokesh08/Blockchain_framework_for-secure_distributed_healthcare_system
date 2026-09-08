@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const fs = require('fs');
 const { saveUser, loadUsers } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'HealthcareJwtSecret2026!';
@@ -114,6 +116,34 @@ async function loadPersistedUsers() {
   }
 }
 
+// Load permanent demo accounts committed in the repo (survive every redeploy, unlike sqlite).
+function loadExtraSeedUsers() {
+  const jsonPath = path.join(__dirname, 'seed-extra-users.json');
+  if (!fs.existsSync(jsonPath)) return 0;
+  try {
+    const entries = JSON.parse(fs.readFileSync(jsonPath, 'utf8') || '[]');
+    let added = 0;
+    for (const e of entries) {
+      if (!e.phone || !e.passwordHash || !e.patientId) continue;
+      if (users.some(u => u.phone === e.phone) || users.some(u => u.patientId === e.patientId)) continue;
+      users.push({
+        username: e.username || `patient_${e.patientId}`,
+        password: e.passwordHash,
+        role: e.role || 'Patient',
+        name: e.name,
+        age: e.age,
+        phone: e.phone,
+        patientId: e.patientId
+      });
+      added++;
+    }
+    return added;
+  } catch (err) {
+    console.error('[auth] failed to load extra seed users:', err.message);
+    return 0;
+  }
+}
+
 function seedPatient(details) {
   if (users.find(u => u.patientId === details.patientId)) return null;
   const user = {
@@ -177,6 +207,7 @@ module.exports = {
   authenticateToken,
   authorizeRoles,
   createPatientUser,
+  loadExtraSeedUsers,
   loadPersistedUsers,
   setDb,
   getAllPatients,

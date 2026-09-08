@@ -1,0 +1,18 @@
+[
+  {
+    "name": "Challa lokesh",
+    "phone": "+916305363032",
+    "passwordHash": "$2a$10$6aiKpaN35xKxM5Lh./SKoOHNblSJrMIDORUCnZhUmSuqt.X0ZB4na",
+    "patientId": "P-3001",
+    "age": 21,
+    "role": "Patient"
+  },
+  {
+    "name": "Abhiram",
+    "phone": "+916000000002",
+    "passwordHash": "$2a$10$6aiKpaN35xKxM5Lh./SKoOHNblSJrMIDORUCnZhUmSuqt.X0ZB4na",
+    "patientId": "P-3002",
+    "age": 23,
+    "role": "Patient"
+  }
+]

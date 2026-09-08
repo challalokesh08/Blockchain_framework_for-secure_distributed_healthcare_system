@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const jsonwebtoken = require('jsonwebtoken');
 const { Blockchain, PatientRecordTransaction, VALIDATORS, roleForValidator } = require('./blockchain');
-const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients, seedPatient, seedDoctor, loadPersistedUsers, setDb, STAFF_ROLES } = require('./auth');
+const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients, seedPatient, seedDoctor, loadPersistedUsers, loadExtraSeedUsers, setDb, STAFF_ROLES } = require('./auth');
 const { getUserByPatientId } = require('./auth');
 const { sendSMS } = require('./notifications');
 const multer = require('multer');
@@ -55,6 +55,8 @@ const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
   try {
     const restoredUsers = await loadPersistedUsers();
     if (restoredUsers > 0) console.log(`Restored ${restoredUsers} previously registered user(s) from sqlite.`);
+    const extraSeeded = loadExtraSeedUsers();
+    if (extraSeeded > 0) console.log(`Registered ${extraSeeded} permanent demo account(s) from seed-extra-users.json.`);
     const dataset = require('../dataset');
     const seedImageDir = path.join(__dirname, 'seed-images');
     let seeded = 0;
