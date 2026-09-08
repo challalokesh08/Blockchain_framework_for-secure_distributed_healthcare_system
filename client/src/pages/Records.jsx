@@ -23,6 +23,11 @@ function Records() {
   const [reportPhoto, setReportPhoto] = useState(null);
   const [reportPhotoPreview, setReportPhotoPreview] = useState('');
   const [message, setMessage] = useState('');
+  const [showAddPatient, setShowAddPatient] = useState(false);
+  const [newPatient, setNewPatient] = useState({ name: '', age: '', phone: '', password: '' });
+  const [addPatientMessage, setAddPatientMessage] = useState('');
+
+  const canAddPatient = isStaff && (user?.role === 'Doctor' || user?.role === 'Admin');
 
   useEffect(() => {
     if (isStaff) {
@@ -116,6 +121,27 @@ function Records() {
     }
   };
 
+  const addPatient = async (event) => {
+    event.preventDefault();
+    setAddPatientMessage('');
+    try {
+      const response = await api.post('/api/auth/register-patient', newPatient);
+      setAddPatientMessage(response.data.message);
+      const createdPatientId = response.data.user?.patientId;
+      setNewPatient({ name: '', age: '', phone: '', password: '' });
+      setShowAddPatient(false);
+      setPatientFilter('');
+      api.get('/api/patients')
+        .then(r => {
+          setPatients(r.data.patients || []);
+          if (createdPatientId) loadPatientData(createdPatientId);
+        })
+        .catch(() => {});
+    } catch (error) {
+      setAddPatientMessage(error.response?.data?.error || 'Unable to add patient.');
+    }
+  };
+
   const grantConsent = async (event) => {
     event.preventDefault();
     setConsentMessage('');
@@ -164,6 +190,38 @@ function Records() {
                 Search patients
                 <input value={patientFilter} onChange={e => setPatientFilter(e.target.value)} placeholder="Search by name, ID or phone..." />
               </label>
+              {canAddPatient && (
+                <>
+                  <div style={{ marginTop: '0.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                    <button type="button" className="button secondary" onClick={() => setShowAddPatient(!showAddPatient)}>
+                      {showAddPatient ? 'Cancel' : '+ Add new patient'}
+                    </button>
+                  </div>
+                  {showAddPatient && (
+                    <form className="record-form" onSubmit={addPatient} style={{ marginTop: '1rem' }}>
+                      <h4>Register a new patient</h4>
+                      <label>
+                        Full name
+                        <input value={newPatient.name} onChange={e => setNewPatient({ ...newPatient, name: e.target.value })} required placeholder="e.g. Rama Devi" />
+                      </label>
+                      <label>
+                        Age
+                        <input type="number" min="0" value={newPatient.age} onChange={e => setNewPatient({ ...newPatient, age: e.target.value })} required placeholder="e.g. 32" />
+                      </label>
+                      <label>
+                        Phone number
+                        <input value={newPatient.phone} onChange={e => setNewPatient({ ...newPatient, phone: e.target.value })} required placeholder="e.g. +9163xxxxxx" />
+                      </label>
+                      <label>
+                        Password (min 6 characters)
+                        <input type="text" value={newPatient.password} onChange={e => setNewPatient({ ...newPatient, password: e.target.value })} required placeholder="Login password for the patient" />
+                      </label>
+                      <button type="submit" className="button primary">Register patient</button>
+                      {addPatientMessage && <p className="form-message">{addPatientMessage}</p>}
+                    </form>
+                  )}
+                </>
+              )}
               <div className="patient-list">
                 {filteredPatients.length === 0 && <p>No patients found.</p>}
                 {filteredPatients.map(p => (

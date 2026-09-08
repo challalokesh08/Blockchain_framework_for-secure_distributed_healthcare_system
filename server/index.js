@@ -161,6 +161,28 @@ app.post('/api/auth/register', (req, res) => {
   res.status(201).json({ token, user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone } });
 });
 
+// Staff (Doctor/Admin) can onboard a new patient without the patient self-registering.
+app.post('/api/auth/register-patient', authenticateToken, authorizeRoles('Doctor', 'Admin'), (req, res) => {
+  const { name, age, phone, password } = req.body;
+  if (!name || age === undefined || age === null || !phone || !password) {
+    return res.status(400).json({ error: 'Name, age, phone number, and password are required.' });
+  }
+  if (typeof password !== 'string' || password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+  }
+
+  const normalizedPhone = String(phone).trim();
+  if (findUserByPhone(normalizedPhone)) {
+    return res.status(409).json({ error: 'Phone number is already registered.' });
+  }
+
+  const user = createPatientUser({ name, age, phone: normalizedPhone, password });
+  res.status(201).json({
+    message: `Patient registered with ID ${user.patientId}.`,
+    user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone }
+  });
+});
+
 app.get('/api/status', (req, res) => {
   res.json({ status: 'online', ...ledger.getStatus() });
 });
