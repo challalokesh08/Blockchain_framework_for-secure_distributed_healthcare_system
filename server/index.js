@@ -111,6 +111,23 @@ const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
         }
       }
     }
+    // Permanent demo records for the extra seeded accounts (seed-extra-users.json)
+    const extraUsers = require('./seed-extra-users.json');
+    for (const eu of extraUsers) {
+      ledger.addTransaction({
+        patientId: eu.patientId,
+        author: 'Dr. Rajesh Varma',
+        data: {
+          diagnosis: eu.name.toLowerCase().includes('lokesh') ? 'Routine health assessment' : 'Pre-visit screening',
+          notes: `Permanent demo record created at startup for ${eu.name}.`,
+          department: 'General Medicine',
+          physician: 'Dr. Rajesh Varma',
+          lab: 'City General Hospital'
+        }
+      });
+      consentRegistry.grant({ patientId: eu.patientId, providerName: 'Dr. Rajesh Varma', providerType: 'Doctor', purpose: 'Primary care coordination', requester: { name: 'System (seed)' } });
+      consentRegistry.grant({ patientId: eu.patientId, providerName: 'City General Hospital', providerType: 'Hospital', purpose: 'Hospital care operations', requester: { name: 'System (seed)' } });
+    }
     if (seeded > 0) {
       ledger.finalizeBlock('VALIDATOR-CARE-NODE-A');
       console.log(`Seeded ${seeded} patients, medical records, ${seededFiles} image files, ${seededDoctors} doctors, and consents on startup`);
