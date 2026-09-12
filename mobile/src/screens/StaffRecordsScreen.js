@@ -13,16 +13,38 @@ export default function StaffRecordsScreen() {
   const [accessError, setAccessError] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [requests, setRequests] = useState([]);
+  const [showEmerForm, setShowEmerForm] = useState(false);
+  const [emerReason, setEmerReason] = useState('');
+  const [emerTriage, setEmerTriage] = useState('3');
+  const [emerMsg, setEmerMsg] = useState('');
+  const [vitals, setVitals] = useState(null);
+  const [emerBusy, setEmerBusy] = useState(false);
+  const isDoctorOrAdmin = user?.role === 'Doctor' || user?.role === 'Admin';
+  const isAdmin = user?.role === 'Admin';
+
+  const loadEmergency = () => {
+    api.get('/api/emergency')
+      .then(r => setRequests(r.data.requests || []))
+      .catch(() => setRequests([]));
+  };
 
   useEffect(() => {
     api.get('/api/patients')
       .then(r => setPatients(r.data.patients || []))
       .catch(() => Alert.alert('Error', 'Could not load patient list.'))
       .finally(() => setLoading(false));
+    loadEmergency();
   }, []);
 
+  const loadEmergencyDetail = () => {
+    try {
+      loadEmergency();
+    } catch (e) {}
+  };
+
   const selectPatient = async (p) => {
-    setSelected(p); setLoadingDetail(true); setAccessError(''); setRecords([]); setFiles([]);
+    setSelected(p); setLoadingDetail(true); setAccessError(''); setRecords([]); setFiles([]); setVitals(null); setEmerMsg('');
     try {
       const rRes = await api.get('/api/records', { params: { patientId: p.patientId } });
       let fRes = { data: { files: [] } };
@@ -48,6 +70,131 @@ export default function StaffRecordsScreen() {
     }
   };
 
+  const requestEmergency = async () => {
+    if (!emerReason.trim()) { Alert.alert('Emergency unlock', 'Please describe the emergency reason.'); return; }
+    const t = parseInt(emerTriage, 10);
+    if (isNaN(t) || t < 1 || t > 3) { Alert.alert('Emergency unlock', 'Triage code must be 1, 2 or 3 (critical cases only).'); return; }
+    setEmerBusy(true); setEmerMsg('');
+    try {
+      const response = await api.post('/api/emergency/request', { patientId: selected.patientId, reason: emerReason.trim(), triageCode: t });
+      setEmerMsg(response.data.message);
+      setShowEmerForm(false); setEmerReason('');
+      loadEmergencyDetail();
+    } catch (error) {
+      setEmerMsg(error.response?.data?.error || 'Unable to raise emergency request.');
+    } finally {
+      setEmerBusy(false);
+    }
+  };
+
+  const confirmEmergency = async (id, approved) => {
+    setEmerBusy(true); setEmerMsg('');
+    try {
+      const response = await api.post(`/api/emergency/confirm/${id}`, { approved });
+      setEmerMsg(response.data.message);
+      loadEmergencyDetail();
+    } catch (error) {
+      setEmerMsg(error.response?.data?.error || 'Unable to update the emergency request.');
+    } finally {
+      setEmerBusy(false);
+    }
+  };
+
+  const viewVitalPacket = async () => {
+    setEmerBusy(true); setEmerMsg('');
+    try {
+      const response = await api.get('/api/records', { params: { patientId: selected.patientId, emergency: '1' } });
+      setVitals(response.data.vitals || {});
+      setRecords([]);
+      setFiles([]);
+    } catch (error) {
+      setEmerMsg(error.response?.data?.error || 'Unable to load the vital packet.');
+    } finally {
+      setEmerBusy(false);
+    }
+  };
+
+  const activeForPatient = (pid) => requests.find(r =>
+    r.patientId === pid && r.status === 'APPROVED' && r.unlockExpiresAt && new Date(r.unlockExpiresAt).getTime() > Date.now()
+  );
+
+  const EmergencySection = ({ pid }) => {
+    const active = activeForPatient(pid);
+    const pendingList = requests.filter(r => r.patientId === pid && r.status === 'PENDING');
+    if (!isDoctorOrAdmin) return null;
+    return (
+      <View style={s.card}>
+        <Text style={s.sectHead}>Emergency access (break-glass)</Text>
+        {active ? (
+          <>
+            <Text style={s.good}>ACTIVE UNLOCK — expires {new Date(active.unlockExpiresAt).toLocaleString()}</Text>
+            <Text style={s.muted}>Requested by {active.doctor} · approved by {active.confirmedBy} · triage {active.triageCode}. Vital info only — full history stays locked.</Text>
+            <Button title="View vital packet" color="#2fbf9f" onPress={viewVitalPacket} disabled={emerBusy} />
+          </>
+        ) : pendingList.length > 0 ? (
+          pendingList.map(r => (
+            <View key={r.id}>
+              <Text style={s.warn}>PENDING — request {r.id} (triage {r.triageCode}) by {r.doctor} awaits admin approval.</Text>
+              <Text style={s.muted}>{r.reason}</Text>
+              {isAdmin ? (
+                <View style={s.btnRow}>
+                  <Button title="Approve" color="#2fbf9f" onPress={() => confirmEmergency(r.id, true)} disabled={emerBusy} />
+                  <Button title="Reject" color="#ff7a6b" onPress={() => confirmEmergency(r.id, false)} disabled={emerBusy} />
+                </View>
+              ) : null}
+            </View>
+          ))
+        ) : user?.role === 'Admin' ? (
+          <Text style={s.muted}>No pending emergency requests for this patient.</Text>
+        ) : (
+          <>
+            <Text style={s.muted}>Patient unable to consent? Request a time-boxed, vital-only unlock. Requires admin approval and is recorded on the ledger.</Text>
+            {showEmerForm ? (
+              <>
+                <TextInput
+                  style={s.input}
+                  placeholder="Reason (e.g. RTA victim, unconscious)"
+                  placeholderTextColor="#666"
+                  multiline
+                  value={emerReason}
+                  onChangeText={setEmerReason}
+                />
+                <TextInput
+                  style={s.input}
+                  placeholder="Triage code (1-3, critical only)"
+                  placeholderTextColor="#666"
+                  keyboardType="numeric"
+                  value={emerTriage}
+                  onChangeText={setEmerTriage}
+                />
+                <View style={s.btnRow}>
+                  <Button title="Request unlock" color="#5b8ff9" onPress={requestEmergency} disabled={emerBusy} />
+                  <Button title="Cancel" color="#888" onPress={() => setShowEmerForm(false)} />
+                </View>
+              </>
+            ) : (
+              <Button title="Request emergency unlock" color="#5b8ff9" onPress={() => setShowEmerForm(true)} />
+            )}
+          </>
+        )}
+        {emerMsg ? <Text style={s.msg}>{emerMsg}</Text> : null}
+      </View>
+    );
+  };
+
+  const VitalCard = () => {
+    if (!vitals) return null;
+    return (
+      <View style={[s.card, { borderColor: '#2fbf9f' }]}>
+        <Text style={s.sectHead}>Emergency vital packet — VITAL ONLY</Text>
+        <Text style={s.text}>Blood type: {vitals.bloodType}</Text>
+        <Text style={s.text}>Allergies: {(vitals.allergies || []).join(', ') || 'None'}</Text>
+        <Text style={s.text}>Medications: {(vitals.medications || []).join(', ') || 'None'}</Text>
+        <Text style={s.text}>Chronic conditions: {(vitals.chronicConditions || []).join(', ') || 'None'}</Text>
+      </View>
+    );
+  };
+
   const filtered = patients.filter(p =>
     `${p.patientId} ${p.name} ${p.phone}`.toLowerCase().includes(filter.toLowerCase())
   );
@@ -66,6 +213,8 @@ export default function StaffRecordsScreen() {
         <Text style={s.sub}>Patient: {selected.patientId} | {selected.phone}</Text>
         {loadingDetail ? <ActivityIndicator size="large" color="#5b8ff9" style={{ marginTop: 24 }} /> : (
           <>
+            <EmergencySection pid={selected.patientId} />
+            <VitalCard />
             {accessError ? (
               <>
                 <Text style={s.accessError}>{accessError}</Text>
@@ -73,12 +222,12 @@ export default function StaffRecordsScreen() {
               </>
             ) : (
               <>
-            <Text style={s.resultHead}>{records.length} record(s) · {files.length} file(s)</Text>
-            <FlatList
-              data={items}
-              keyExtractor={i => i.key}
-              style={{ marginTop: 10 }}
-              renderItem={({ item }) => {
+                <Text style={s.resultHead}>{records.length} record(s) · {files.length} file(s)</Text>
+                <FlatList
+                  data={items}
+                  keyExtractor={i => i.key}
+                  style={{ marginTop: 10 }}
+                  renderItem={({ item }) => {
                 if (item.type === 'record') {
                   const r = item.data;
                   return (
@@ -160,4 +309,10 @@ const s = StyleSheet.create({
   date: { fontSize: 12, color: '#888' },
   text: { fontSize: 13, color: '#ccc', marginBottom: 2 },
   hash: { fontSize: 11, color: '#666', marginTop: 6 },
+  sectHead: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 8 },
+  good: { fontSize: 14, color: '#2fbf9f', fontWeight: '700', marginBottom: 4 },
+  warn: { fontSize: 13, color: '#f0b84b', marginBottom: 4 },
+  muted: { fontSize: 12, color: '#888', marginBottom: 6 },
+  msg: { fontSize: 12, color: '#8ab4ff', marginTop: 6 },
+  btnRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, gap: 8 },
 });
