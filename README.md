@@ -115,6 +115,15 @@ Each of the 22 seeded doctors (phone `+155510010001` … `+155510010022`, passwo
 >
 > **PoA demo:** Admin can seal pending transactions into a block via `POST /api/mine`. Blocks show the sealed-by validator and signature.
 
+> **Break-glass (emergency access) demo:**
+> 1. Login as a doctor (e.g. `+15550000001` / `doctorpass`) → **Records** → select a patient → try reading (expect **403**, no consent).
+> 2. In the **Emergency access (break-glass)** panel, raise a request with a reason + triage code 1–3.
+> 3. Login as Admin (`+15550000003` / `adminpass`) → **Records** → **Emergency requests — admin approval** → **Approve**.
+> 4. Back as the doctor: **ACTIVE UNLOCK** banner appears → **View vital packet** returns *only* blood type, allergies, medications and chronic conditions — full history stays locked.
+> 5. Login as the patient → **Emergency access events** shows the full request/approval audit trail.
+>
+> **Security:** only *critical* triage (1–3) qualifies; requests alone grant nothing; approval requires a second party (Admin); unlock is time-boxed (30 min) and vital-scope only; every request, approval and rejection is recorded **on-chain** and the patient is notified by SMS.
+
 ---
 
 ## Patient Accounts (110 seeded patients)

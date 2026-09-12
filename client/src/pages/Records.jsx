@@ -26,8 +26,22 @@ function Records() {
   const [showAddPatient, setShowAddPatient] = useState(false);
   const [newPatient, setNewPatient] = useState({ name: '', age: '', phone: '', password: '' });
   const [addPatientMessage, setAddPatientMessage] = useState('');
+  const [emergencyForm, setEmergencyForm] = useState({ reason: '', triageCode: '3' });
+  const [emergencyRequests, setEmergencyRequests] = useState([]);
+  const [emergencyMsg, setEmergencyMsg] = useState('');
+  const [vitalPacket, setVitalPacket] = useState(null);
 
   const canAddPatient = isStaff && (user?.role === 'Doctor' || user?.role === 'Admin');
+
+  const loadEmergency = useCallback(() => {
+    api.get('/api/emergency')
+      .then(r => setEmergencyRequests(r.data.requests || []))
+      .catch(() => setEmergencyRequests([]));
+  }, []);
+
+  useEffect(() => {
+    loadEmergency();
+  }, [loadEmergency]);
 
   useEffect(() => {
     if (isStaff) {
@@ -46,6 +60,7 @@ function Records() {
   const loadPatientData = useCallback((pid) => {
     setSelectedPatientId(pid);
     setAccessMessage('');
+    setVitalPacket(null);
     const params = { patientId: pid };
     api.get('/api/records', { params })
       .then(r => setRecords((r.data.records || []).filter(rec => rec.data?.diagnosis)))
@@ -172,6 +187,54 @@ function Records() {
 
   const selectedPatient = patients.find(p => p.patientId === selectedPatientId);
 
+  const requestEmergency = async (event) => {
+    event.preventDefault();
+    setEmergencyMsg('');
+    try {
+      const response = await api.post('/api/emergency/request', {
+        patientId: selectedPatientId,
+        reason: emergencyForm.reason,
+        triageCode: emergencyForm.triageCode
+      });
+      setEmergencyMsg(response.data.message);
+      setEmergencyForm({ reason: '', triageCode: '3' });
+      loadEmergency();
+    } catch (error) {
+      setEmergencyMsg(error.response?.data?.error || 'Unable to raise emergency request.');
+    }
+  };
+
+  const confirmEmergency = async (id, approved) => {
+    setEmergencyMsg('');
+    try {
+      const response = await api.post(`/api/emergency/confirm/${id}`, { approved });
+      setEmergencyMsg(response.data.message);
+      loadEmergency();
+    } catch (error) {
+      setEmergencyMsg(error.response?.data?.error || 'Unable to update the emergency request.');
+    }
+  };
+
+  const viewVitalPacket = async () => {
+    setEmergencyMsg('');
+    try {
+      const response = await api.get('/api/records', { params: { patientId: selectedPatientId, emergency: '1' } });
+      setVitalPacket(response.data.vitals || {});
+      setRecords([]);
+      setFiles([]);
+    } catch (error) {
+      setEmergencyMsg(error.response?.data?.error || 'Unable to load the vital packet.');
+    }
+  };
+
+  const pendingRequest = emergencyRequests.find(r => r.patientId === selectedPatientId && r.status === 'PENDING');
+  const activeUnlock = emergencyRequests.find(r =>
+    r.patientId === selectedPatientId &&
+    r.status === 'APPROVED' &&
+    r.unlockExpiresAt &&
+    new Date(r.unlockExpiresAt).getTime() > Date.now()
+  );
+
   return (
     <section className="section section-alt">
       <div className="container records-grid">
@@ -238,6 +301,64 @@ function Records() {
                 ))}
               </div>
               {accessMessage && <p className="consent-warning">{accessMessage}</p>}
+              {canAddPatient && selectedPatient && (
+                <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
+                  <h4>Emergency access (break-glass)</h4>
+                  {activeUnlock ? (
+                    <>
+                      <p><span className="status-pill success">ACTIVE UNLOCK</span> expires {new Date(activeUnlock.unlockExpiresAt).toLocaleString()}</p>
+                      <p className="consent-purpose">Requested by {activeUnlock.doctor} · approved by {activeUnlock.confirmedBy} · triage {activeUnlock.triageCode}</p>
+                      <p className="consent-purpose">Scope is vital information only — full history stays locked. The whole event is logged on the ledger.</p>
+                      <button type="button" className="button primary" onClick={viewVitalPacket}>View vital packet</button>
+                    </>
+                  ) : pendingRequest ? (
+                    <p className="consent-purpose">
+                      <span className="status-pill warning">PENDING</span> Emergency request {pendingRequest.id} (triage {pendingRequest.triageCode}) is awaiting admin approval. No access until then.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="consent-purpose">Patient unable to consent? Request a time-boxed, vital-only emergency unlock. It requires a second approval (admin) and is permanently recorded on the ledger.</p>
+                      <form className="record-form" onSubmit={requestEmergency}>
+                        <label>
+                          Reason
+                          <textarea rows="2" value={emergencyForm.reason} onChange={e => setEmergencyForm({ ...emergencyForm, reason: e.target.value })} required placeholder="e.g. Trauma — patient unconscious at ER intake" />
+                        </label>
+                        <label>
+                          Triage code
+                          <select value={emergencyForm.triageCode} onChange={e => setEmergencyForm({ ...emergencyForm, triageCode: e.target.value })}>
+                            <option value="1">1 — Resuscitation</option>
+                            <option value="2">2 — Emergency</option>
+                            <option value="3">3 — Urgent</option>
+                          </select>
+                        </label>
+                        <p className="consent-purpose">Only critical cases (triage 1-3) qualify. Non-urgent access requires normal patient consent.</p>
+                        <button type="submit" className="button primary">Request emergency unlock</button>
+                      </form>
+                    </>
+                  )}
+                  {emergencyMsg && <p className="form-message">{emergencyMsg}</p>}
+                </div>
+              )}
+              {user?.role === 'Admin' && (
+                <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
+                  <h4>Emergency requests — admin approval</h4>
+                  {emergencyRequests.filter(r => r.status === 'PENDING').length === 0
+                    ? <p className="consent-purpose">No pending emergency requests.</p>
+                    : emergencyRequests.filter(r => r.status === 'PENDING').map(r => (
+                      <div key={r.id} className="consent-row">
+                        <div>
+                          <strong>{r.patientId}</strong> — requested by {r.doctor} (triage {r.triageCode})
+                          <p className="consent-purpose">{r.reason}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button type="button" className="button primary" onClick={() => confirmEmergency(r.id, true)}>Approve</button>
+                          <button type="button" className="button secondary" onClick={() => confirmEmergency(r.id, false)}>Reject</button>
+                        </div>
+                      </div>
+                    ))}
+                  {emergencyMsg && <p className="form-message">{emergencyMsg}</p>}
+                </div>
+              )}
               {selectedPatient && (
                 <form className="record-form" onSubmit={submitRecord} style={{ marginTop: '1.5rem' }}>
                   <h4>Add record for {selectedPatient.name} ({selectedPatient.patientId})</h4>
@@ -314,6 +435,23 @@ function Records() {
                   )}
                 </div>
               </div>
+              <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
+                <h4>Emergency access events</h4>
+                <p>Any time an emergency unlock is requested or granted on your records, it is recorded on the ledger and listed here.</p>
+                {emergencyRequests.length === 0 ? (
+                  <p className="consent-purpose">No emergency access events.</p>
+                ) : (
+                  emergencyRequests.map(r => (
+                    <div key={r.id} className="consent-row">
+                      <div>
+                        <strong>{r.id}</strong> — {r.doctor} ({r.triageCode}) — <span className={`status-pill ${r.status === 'APPROVED' ? 'success' : r.status === 'REJECTED' ? 'revoked' : r.status === 'PENDING' ? 'warning' : 'warning'}`}>{r.status}</span>
+                        <p className="consent-purpose">{r.reason}</p>
+                        {r.unlockExpiresAt && <p className="consent-purpose">Unlock expires: {new Date(r.unlockExpiresAt).toLocaleString()}</p>}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </>
           )}
         </div>
@@ -324,6 +462,21 @@ function Records() {
             <h3>{selectedPatient ? `${selectedPatient.name} (${selectedPatient.patientId})` : 'Your'} record history</h3>
             <p>Review decrypted records pulled from the secure blockchain ledger.</p>
           </div>
+          {vitalPacket && (
+            <article className="history-card vital-card">
+              <div className="history-card-meta">
+                <span><strong>Emergency vital packet</strong></span>
+                <span>Scope: VITAL ONLY</span>
+              </div>
+              <p><strong>Blood type:</strong> {vitalPacket.bloodType}</p>
+              <p><strong>Allergies:</strong> {vitalPacket.allergies?.join(', ') || 'None'}</p>
+              <p><strong>Medications:</strong> {vitalPacket.medications?.join(', ') || 'None'}</p>
+              <p><strong>Chronic conditions:</strong> {vitalPacket.chronicConditions?.join(', ') || 'None'}</p>
+              {activeUnlock && (
+                <p className="history-card-hash">Unlock {activeUnlock.unlockId} expires {new Date(activeUnlock.unlockExpiresAt).toLocaleString()}. Full history remains locked without patient consent.</p>
+              )}
+            </article>
+          )}
           {!isStaff && records.length === 0 && accessMessage ? (
             <p className="consent-warning">{accessMessage}</p>
           ) : records.length === 0 ? (

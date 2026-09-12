@@ -119,6 +119,15 @@ The `isChainValid()` function checks:
 - Shows block hash, previous hash, timestamp, transaction count
 - Real-time ledger status (block count, pending items, validity)
 
+### 4.8 Break-Glass Emergency Access
+- Solves the "incapacitated patient" scenario without ever granting blanket access
+- **Two-party authorization (2-of-2):** a doctor *requests* an emergency unlock, an admin *approves* it — a single person can never unlock alone
+- **Critical-cases only:** triage codes 1–3 qualify; 4–5 are rejected with a prompt to use normal patient consent
+- **Least privilege:** an approved unlock exposes only the *vital packet* (blood type, allergies, medications, chronic conditions) — full medical history stays locked, even for Admin-normal reads
+- **Time-boxed:** unlock auto-expires after 30 minutes; unapproved requests expire after 60 minutes
+- **Fully auditable:** `EMERGENCY_REQUEST`, `EMERGENCY_APPROVED` and `EMERGENCY_REJECTED` events are sealed into the ledger as first-class transactions
+- **Patient notified:** an SMS alert is sent immediately on approval, and the patient's Records page lists every emergency event against their ID
+
 ---
 
 ## 5. Technology Stack
@@ -169,10 +178,16 @@ The `isChainValid()` function checks:
 |--------|----------|---------------|-------------|
 | POST | /api/auth/login | No | Login with phone + password |
 | POST | /api/auth/register | No | Register new patient |
+| POST | /api/auth/register-patient | Doctor/Admin | Add a new patient (staff-initiated) |
 | GET | /api/status | No | Blockchain status |
 | GET | /api/ledger | Yes | Full blockchain ledger |
 | GET | /api/records?patientId=X | Yes | Get patient records |
+| GET | /api/records?patientId=X&emergency=1 | Staff (with active unlock) | Get vital-packet only for emergency |
 | POST | /api/records | Doctor/Nurse/Admin | Add record transaction |
+| POST | /api/records/with-report | Doctor/Nurse/Admin | Add record with optional report photo + lab |
+| POST | /api/emergency/request | Doctor/Admin | Raise an emergency (break-glass) access request |
+| POST | /api/emergency/confirm/:id | Admin | Approve or reject an emergency request |
+| GET | /api/emergency | Yes | List emergency requests (role-scoped) |
 | POST | /api/files/upload | Doctor/Nurse/Admin | Upload file + notify patient |
 | GET | /api/files/:filename | Yes / Signed URL | Download file |
 | GET | /api/files | Yes | List files for patient |
@@ -268,6 +283,7 @@ Patient Data (plaintext)
 - **Signed download URLs** with configurable expiry for file access
 - **CORS enabled** for cross-origin API access
 - **Environment variables** for secrets (ENCRYPTION_KEY, JWT_SECRET)
+- **Break-glass emergency access** — two-party (doctor + admin) time-boxed, vital-scope-only unlock with full on-chain audit and patient SMS notification
 
 ---
 

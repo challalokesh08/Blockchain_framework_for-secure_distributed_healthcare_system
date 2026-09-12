@@ -40,12 +40,15 @@ if (fs.existsSync(metadataFile)) {
 }
 const { ContractEngine } = require('./contracts');
 const { ConsentRegistry } = require('./consent');
+const { EmergencyRegistry } = require('./emergency');
+const { deriveVitals } = require('./vitals');
 
 const app = express();
 const port = process.env.PORT || 4000;
 const ledger = new Blockchain();
 const contractEngine = new ContractEngine(ledger);
 const consentRegistry = new ConsentRegistry();
+const emergencyRegistry = new EmergencyRegistry();
 
 const STAFF_OR_PATIENT = [...STAFF_ROLES, 'Patient'];
 const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
@@ -81,7 +84,7 @@ const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
       const user = seedPatient({ patientId: p.patientId, name: p.name, age: p.age, phone: p.phone });
       if (user) {
         seeded++;
-        ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { diagnosis: p.diagnosis, notes: p.news, department: p.department, physician: p.doctor } });
+        ledger.addTransaction({ patientId: p.patientId, author: p.doctor, data: { diagnosis: p.diagnosis, notes: p.news, department: p.department, physician: p.doctor, vitals: deriveVitals(p.patientId, p.name) } });
         consentRegistry.grant({ patientId: p.patientId, providerName: p.doctor, providerType: 'Doctor', purpose: 'Primary care coordination', requester: { name: 'System (seed)' } });
         consentRegistry.grant({ patientId: p.patientId, providerName: 'City General Hospital', providerType: 'Hospital', purpose: 'Hospital care operations', requester: { name: 'System (seed)' } });
       }
@@ -122,7 +125,8 @@ const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
           notes: `Permanent demo record created at startup for ${eu.name}.`,
           department: 'General Medicine',
           physician: 'Dr. Rajesh Varma',
-          lab: 'City General Hospital'
+          lab: 'City General Hospital',
+          vitals: deriveVitals(eu.patientId, eu.name)
         }
       });
       consentRegistry.grant({ patientId: eu.patientId, providerName: 'Dr. Rajesh Varma', providerType: 'Doctor', purpose: 'Primary care coordination', requester: { name: 'System (seed)' } });
@@ -260,6 +264,76 @@ app.delete('/api/consent', authenticateToken, authorizeRoles('Patient'), (req, r
   }
 });
 
+// Emergency (break-glass) access: doctor requests, admin approves (2-of-2), time-boxed, vital scope only, fully audited on-chain.
+app.get('/api/emergency', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (req, res) => {
+  const { role, name, patientId } = req.user;
+  let requests;
+  if (role === 'Admin') requests = emergencyRegistry.list({ role });
+  else if (role === 'Patient') requests = emergencyRegistry.list({ role, patientId });
+  else requests = emergencyRegistry.list({ doctor: name });
+  res.json({ requests });
+});
+
+app.post('/api/emergency/request', authenticateToken, authorizeRoles('Doctor', 'Admin'), (req, res) => {
+  const { patientId, reason, triageCode } = req.body;
+  if (!patientId || !reason || !triageCode) {
+    return res.status(400).json({ error: 'patientId, reason, and triageCode are required.' });
+  }
+  const triage = Number(triageCode);
+  if (!Number.isInteger(triage) || triage < 1 || triage > 5) {
+    return res.status(400).json({ error: 'triageCode must be an integer between 1 and 5.' });
+  }
+  if (triage > 3) {
+    return res.status(403).json({ error: 'Emergency unlock is only for critical cases (triage 1-3). For non-urgent access, ask the patient to grant consent normally.' });
+  }
+  if (emergencyRegistry.getActiveUnlock(patientId)) {
+    return res.status(409).json({ error: `An active emergency unlock already exists for ${patientId}.` });
+  }
+
+  const request = emergencyRegistry.request({ patientId, doctor: req.user.name, doctorPhone: req.user.phone || null, reason, triageCode: triage });
+  try {
+    ledger.addTransaction({ patientId, author: req.user.name, data: { type: 'emergency', action: 'EMERGENCY_REQUEST', requestId: request.id, doctor: request.doctor, reason, triageCode: triage, status: 'PENDING' } });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+  res.status(201).json({ message: 'Emergency access request logged. An admin must approve it before any access is granted.', request });
+});
+
+app.post('/api/emergency/confirm/:id', authenticateToken, authorizeRoles('Admin'), (req, res) => {
+  const approved = req.body && req.body.approved !== false;
+  let request;
+  try {
+    request = emergencyRegistry.confirm(req.params.id, req.user.name, approved);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  try {
+    ledger.addTransaction({
+      patientId: request.patientId,
+      author: req.user.name,
+      data: { type: 'emergency', action: approved ? 'EMERGENCY_APPROVED' : 'EMERGENCY_REJECTED', requestId: request.id, doctor: request.doctor, admin: request.confirmedBy, reason: request.reason, triageCode: request.triageCode, expiresAt: request.unlockExpiresAt || null }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  const patientUser = getUserByPatientId(request.patientId);
+  if (patientUser && patientUser.phone) {
+    const message = approved
+      ? `HealthLedger alert: temporary emergency access to your vital records was granted to ${request.doctor} until ${request.unlockExpiresAt}. Log in to review and revoke it.`
+      : `HealthLedger notice: an emergency access request by ${request.doctor} was reviewed and not approved.`;
+    sendSMS(patientUser.phone, message).catch(() => {});
+  }
+
+  res.json({
+    message: approved
+      ? `Emergency access approved for ${request.patientId}. Vital-only unlock active until ${request.unlockExpiresAt}.`
+      : `Emergency access request ${request.id} was rejected.`,
+    request
+  });
+});
+
 app.get('/api/records', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (req, res) => {
   const requestedPatientId = req.query.patientId || req.user.patientId;
   if (!requestedPatientId) {
@@ -270,8 +344,39 @@ app.get('/api/records', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), 
     if (requestedPatientId !== req.user.patientId) {
       return res.status(403).json({ error: 'Patients may only access their own records.' });
     }
-  } else if (req.user.role !== 'Admin' && !consentRegistry.hasActiveConsent({ patientId: requestedPatientId, requester: req.user })) {
-    return res.status(403).json({ error: `Patient consent required. No active consent for ${requestedPatientId} authorizing ${req.user.role}.` });
+    const records = ledger.getPatientRecords(requestedPatientId);
+    return res.json({ patientId: requestedPatientId, records, consentRequired: true });
+  }
+
+  const emergencyMode = req.query.emergency === '1' || req.query.emergency === 'true';
+
+  if (req.user.role !== 'Admin') {
+    if (emergencyMode) {
+      const unlock = emergencyRegistry.getActiveUnlock(requestedPatientId);
+      if (!unlock) {
+        return res.status(403).json({ error: `No active emergency unlock for ${requestedPatientId}. Emergency access requires a doctor's request and an admin's approval.` });
+      }
+    } else if (!consentRegistry.hasActiveConsent({ patientId: requestedPatientId, requester: req.user })) {
+      return res.status(403).json({ error: `Patient consent required. No active consent for ${requestedPatientId} authorizing ${req.user.role}.` });
+    }
+  }
+
+  if (emergencyMode) {
+    const unlock = emergencyRegistry.getActiveUnlock(requestedPatientId);
+    let vitals = null;
+    for (const rec of ledger.getPatientRecords(requestedPatientId)) {
+      if (rec.data && rec.data.vitals) { vitals = rec.data.vitals; break; }
+    }
+    if (!vitals) vitals = deriveVitals(requestedPatientId);
+    return res.json({
+      patientId: requestedPatientId,
+      emergency: true,
+      scope: 'VITAL_ONLY',
+      unlock: unlock
+        ? { unlockId: unlock.unlockId, approvedBy: unlock.confirmedBy, requestedBy: unlock.doctor, reason: unlock.reason, triageCode: unlock.triageCode, expiresAt: unlock.unlockExpiresAt }
+        : null,
+      vitals
+    });
   }
 
   const records = ledger.getPatientRecords(requestedPatientId);
