@@ -68,6 +68,34 @@ VALIDATOR_SECRET=YourStrongPoAValidatorSealingKey2026
 - The RSA keypair used for encryption is **generated automatically** at first boot in `server/keys/` — no `ENCRYPTION_KEY` needed anymore.
 - Optional: `DOWNLOAD_URL_EXPIRY` (signed download-link lifetime in seconds, default 86400) and `TWILIO_SID`/`TWILIO_TOKEN`/`TWILIO_FROM` for SMS (skip for local demo — notifications fall back to `server/notifications/`).
 
+### Option 4: Mobile App (Android APK + OTA updates)
+
+The mobile app (`mobile/`, Expo) is **build-once, self-updating**. It calls the live Render backend, so no local server is needed on the phone.
+
+| Platform | Approach |
+|----------|----------|
+| **Android** | One-time `eas build` → install the `.apk` on the phone. After that, every code change is pushed with `eas update` and the app auto-downloads it on next launch. Free. |
+| **iOS / iPhone** | Use the web app instead: `https://challalokesh08.github.io/...` (EAS iOS signing requires a paid Apple Developer account). |
+
+**One-time Android setup** (run once from `mobile/`, needs a free account at `expo.dev`):
+
+```
+npm install -g eas-cli          # CLI (already installed on this machine)
+eas login                       # log in with your Expo account
+eas init                        # links the project + writes the real updates URL
+eas build --platform android --profile preview
+```
+
+- `preview` profile produces an installable **`.apk`** (download it from the EAS link and install on the phone — enable "install unknown apps").
+- `eas.json` is committed; `app.json` has `com.healthledger.app` package id and `runtimeVersion` policy.
+
+**Daily workflow after setup** (every code change):
+
+```
+git push
+eas update                      # OTA update — the installed app self-updates on open
+```
+
 ---
 
 ## Demo Credentials
