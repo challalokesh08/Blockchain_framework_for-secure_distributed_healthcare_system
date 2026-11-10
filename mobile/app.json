@@ -2,7 +2,7 @@
   "expo": {
     "name": "HealthLedger",
     "slug": "healthledger-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -19,8 +19,9 @@
     },
     "updates": {
       "enabled": true,
-      "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/b648e10d-27d9-483d-b668-4b827686cd47"
+      "fallbackToCacheTimeout": 15000,
+      "url": "https://u.expo.dev/b648e10d-27d9-483d-b668-4b827686cd47",
+      "checkAutomatically": "ON_LOAD"
     },
     "web": {
       "favicon": "./assets/favicon.png"
