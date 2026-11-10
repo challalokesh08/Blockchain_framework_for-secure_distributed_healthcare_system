@@ -41,6 +41,9 @@ function Records() {
 
   useEffect(() => {
     loadEmergency();
+    // Keep emergency status in sync: an admin may approve on another device.
+    const timer = setInterval(loadEmergency, 10000);
+    return () => clearInterval(timer);
   }, [loadEmergency]);
 
   useEffect(() => {
@@ -61,6 +64,7 @@ function Records() {
     setSelectedPatientId(pid);
     setAccessMessage('');
     setVitalPacket(null);
+    loadEmergency();
     const params = { patientId: pid };
     api.get('/api/records', { params })
       .then(r => setRecords((r.data.records || []).filter(rec => rec.data?.diagnosis)))
@@ -72,7 +76,7 @@ function Records() {
     api.get('/api/files', { params })
       .then(r => setFiles(r.data.files || []))
       .catch(() => {});
-  }, []);
+  }, [loadEmergency]);
 
   useEffect(() => {
     if (!isStaff && user?.patientId) {

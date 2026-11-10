@@ -35,6 +35,9 @@ export default function StaffRecordsScreen() {
       .catch(() => Alert.alert('Error', 'Could not load patient list.'))
       .finally(() => setLoading(false));
     loadEmergency();
+    // Keep emergency status in sync: the admin may approve on another device.
+    const timer = setInterval(loadEmergency, 10000);
+    return () => clearInterval(timer);
   }, []);
 
   const loadEmergencyDetail = () => {
@@ -45,6 +48,7 @@ export default function StaffRecordsScreen() {
 
   const selectPatient = async (p) => {
     setSelected(p); setLoadingDetail(true); setAccessError(''); setRecords([]); setFiles([]); setVitals(null); setEmerMsg('');
+    loadEmergency();
     try {
       const rRes = await api.get('/api/records', { params: { patientId: p.patientId } });
       let fRes = { data: { files: [] } };
@@ -124,7 +128,10 @@ export default function StaffRecordsScreen() {
     if (!isDoctorOrAdmin) return null;
     return (
       <View style={s.card}>
-        <Text style={s.sectHead}>Emergency access (break-glass)</Text>
+        <View style={s.btnRow}>
+          <Text style={s.sectHead}>Emergency access (break-glass)</Text>
+          <Button title="Refresh" color="#5b8ff9" onPress={loadEmergencyDetail} disabled={emerBusy} />
+        </View>
         {active ? (
           <>
             <Text style={s.good}>ACTIVE UNLOCK — expires {new Date(active.unlockExpiresAt).toLocaleString()}</Text>
