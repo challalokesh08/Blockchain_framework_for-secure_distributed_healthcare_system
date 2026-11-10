@@ -20,10 +20,15 @@
     "updates": {
       "enabled": true,
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/YOUR_EAS_PROJECT_ID"
+      "url": "https://u.expo.dev/b648e10d-27d9-483d-b668-4b827686cd47"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b648e10d-27d9-483d-b668-4b827686cd47"
+      }
     }
   }
 }
