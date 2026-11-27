@@ -2,6 +2,7 @@ import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { View, Text, Button, FlatList, StyleSheet, ActivityIndicator, Linking, Alert } from 'react-native';
 import { AuthContext } from '../AuthContext';
 import api from '../api';
+import { getFileViewUrl, saveFileToDevice } from '../files';
 
 export default function RecordsScreen() {
   const { user, token } = useContext(AuthContext);
@@ -47,10 +48,17 @@ export default function RecordsScreen() {
 
   const openFile = async (f) => {
     try {
-      const res = await api.get(`/api/files/link/${encodeURIComponent(f.filename)}`);
-      await Linking.openURL(res.data.url);
+      await Linking.openURL(await getFileViewUrl(f));
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || 'Unable to open this file.');
+    }
+  };
+
+  const downloadFile = async (f) => {
+    try {
+      await saveFileToDevice(f);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Unable to save this file.');
     }
   };
 
@@ -126,7 +134,7 @@ export default function RecordsScreen() {
               <Text style={s.text}>Size: {(f.size / 1024).toFixed(1)} KB</Text>
               <View style={s.btnRow}>
                 <Button title="View" color="#5b8ff9" onPress={() => openFile(f)} />
-                <Button title="Download" color="#58d9a6" onPress={() => openFile(f)} />
+                <Button title="Download" color="#58d9a6" onPress={() => downloadFile(f)} />
               </View>
             </View>
           );

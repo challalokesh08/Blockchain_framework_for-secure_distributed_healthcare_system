@@ -401,6 +401,7 @@ npx expo start
 | Screen | Visible to | What it does |
 |--------|-----------|--------------|
 | **My Records** | All (Patient + Staff) | Shows the logged-in user's own records |
+| **My Files** | Patient | All your uploaded files/images with inline previews, **View** and **Download** (saved to the device via the Android save sheet) |
 | **View Patient Records** | All staff roles (Doctor / Nurse / Admin / Hospital / Laboratory / Insurance) | Search **any** patient ID, request file access, see records + files, raise emergency unlocks |
 | **Notifications** | All logged-in users | Role-scoped inbox for file requests, decisions and emergency updates; tap to open the patient |
 | **File access requests** | Patient | Approve/reject a clinician's file request from the phone |

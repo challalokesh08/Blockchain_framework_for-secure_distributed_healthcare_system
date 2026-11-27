@@ -121,6 +121,7 @@ The `isChainValid()` function checks:
 - Patient details are taken from the committed `dataset.js` (the data in this GitHub repo) rather than relying on blockchain seeding, so the list is complete even on ephemeral deployments; account records from SQLite are merged in
 - A dedicated **Patients** page (web route `/patients`, mobile Home → Patients) separates **My patients** (full records/files) from **Other patients** (names/IDs only, locked until the patient or admin approves a file-access request). One-click **Request access** opens a confirmation popup; requests, decisions and notifications poll every **2 s**; patient/admin notifications carry inline **Grant / Deny / Revoke** actions; admins can decide on the same page
 - Every patient file exposes **View** and **Download** on web and mobile. `GET /api/files/link/:filename` returns a signed, expiring URL after the same consent/ownership checks, so the browser or phone OS can open the image/PDF directly
+- The mobile **My Files** screen lists every file belonging to the logged-in patient with inline image previews. Download uses `expo-file-system` + `expo-sharing` to save the file on the device and open the Android save sheet (these are native modules, so this feature ships in the APK rather than OTA)
 - Every request and decision is written to the ledger (`FILE_ACCESS_REQUEST`, `FILE_ACCESS_APPROVED`, `FILE_ACCESS_REJECTED`)
 - Patients cannot decide requests belonging to other patients; emergency vitals may only be used by the clinician who requested the unlock
 

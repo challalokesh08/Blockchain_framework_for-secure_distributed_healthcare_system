@@ -11,6 +11,7 @@ import UploadScreen from './src/screens/UploadScreen';
 import StaffRecordsScreen from './src/screens/StaffRecordsScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import FilesScreen from './src/screens/FilesScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +30,7 @@ function Navigator() {
           <Stack.Screen name="Upload" component={UploadScreen} options={{ title: 'Upload File' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'My Profile' }} />
+          <Stack.Screen name="Files" component={FilesScreen} options={{ title: 'My Files' }} />
         </>
       )}
     </Stack.Navigator>
