@@ -5,7 +5,9 @@
     "passwordHash": "$2a$10$6aiKpaN35xKxM5Lh./SKoOHNblSJrMIDORUCnZhUmSuqt.X0ZB4na",
     "patientId": "P-3001",
     "age": 21,
-    "role": "Patient"
+    "role": "Patient",
+    "department": "General Medicine",
+    "assignedDoctor": "Dr. Rajesh Varma"
   },
   {
     "name": "Abhiram",
@@ -13,6 +15,8 @@
     "passwordHash": "$2a$10$6aiKpaN35xKxM5Lh./SKoOHNblSJrMIDORUCnZhUmSuqt.X0ZB4na",
     "patientId": "P-3002",
     "age": 23,
-    "role": "Patient"
+    "role": "Patient",
+    "department": "General Medicine",
+    "assignedDoctor": "Dr. Rajesh Varma"
   }
 ]

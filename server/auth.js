@@ -145,7 +145,9 @@ function loadExtraSeedUsers() {
         name: e.name,
         age: e.age,
         phone: e.phone,
-        patientId: e.patientId
+        patientId: e.patientId,
+        department: e.department || null,
+        assignedDoctor: e.assignedDoctor || null
       });
       added++;
     }
