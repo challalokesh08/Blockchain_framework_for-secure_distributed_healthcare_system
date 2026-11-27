@@ -150,6 +150,8 @@ Each of the 22 seeded doctors (phone `+155510010001` … `+155510010022`, passwo
 > 3. Login as the patient (`+916305363032` / `patientpass`) → **File access requests** → **Approve** (or as Admin → **File access requests — approval**).
 > 4. Back as the doctor: records and files load automatically within ~10 s (no manual reload). Only the requesting clinician gets access; the decision is recorded on-chain.
 >
+> **Registration demo:** **Register** on web or mobile → enter name, age, phone, password → choose a **department** (e.g. Cardiology) → choose a **doctor** from that department (e.g. Dr. Rajesh Varma) → submit. The new patient gets a patient ID and the chosen doctor immediately has consent to that patient's records. The doctor directory comes from `GET /api/doctors`.
+>
 > **PoA demo:** Admin can seal pending transactions into a block via `POST /api/mine`. Blocks show the sealed-by validator and signature.
 
 > **Break-glass (emergency access) demo:**
@@ -469,7 +471,8 @@ npm run docker-up
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | POST | `/api/auth/login` | No | Login with phone + password |
-| POST | `/api/auth/register` | No | Register new patient |
+| GET | `/api/doctors` | No | Departments + doctors grouped by department |
+| POST | `/api/auth/register` | No | Register patient (name, age, phone, password, department, assignedDoctor) |
 | GET | `/api/status` | No | Blockchain status (consensus, validators, validity) |
 | GET | `/api/crypto/public-key` | No | Network RSA-2048 public key (key-wrapping) |
 | GET | `/api/ledger` | Yes | Full PoA blockchain ledger |

@@ -89,7 +89,9 @@ function createPatientUser(details) {
     name: details.name,
     age: details.age,
     phone: details.phone,
-    patientId
+    patientId,
+    department: details.department || null,
+    assignedDoctor: details.assignedDoctor || null
   };
   users.push(user);
   if (dbRef) {
@@ -113,7 +115,9 @@ async function loadPersistedUsers() {
         name: row.name,
         age: row.age,
         phone: row.phone,
-        patientId: row.patientId || null
+        patientId: row.patientId || null,
+        department: row.department || null,
+        assignedDoctor: row.assignedDoctor || null
       });
       added++;
     }

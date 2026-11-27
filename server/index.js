@@ -44,6 +44,7 @@ const { EmergencyRegistry } = require('./emergency');
 const { AccessRequestRegistry } = require('./access-requests');
 const { NotificationRegistry } = require('./notification-registry');
 const { deriveVitals } = require('./vitals');
+const { listDoctors, listDepartments, findDoctor } = require('./doctors');
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -204,14 +205,30 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const token = generateToken(user);
-  const publicPayload = { username: user.username, role: user.role, name: user.name, patientId: user.patientId || null, phone: user.phone, organization: user.organization || null };
+  const publicPayload = { username: user.username, role: user.role, name: user.name, patientId: user.patientId || null, phone: user.phone, organization: user.organization || null, department: user.department || null, assignedDoctor: user.assignedDoctor || null };
   res.json({ token, user: publicPayload });
 });
 
+// Public doctor directory for registration (department -> doctors).
+app.get('/api/doctors', (req, res) => {
+  const doctors = listDoctors().map(d => ({
+    name: d.name, department: d.department, patients: d.patients,
+    phone: (getUserByName(d.name) || {}).phone || null
+  }));
+  res.json({ departments: listDepartments(), doctors });
+});
+
 app.post('/api/auth/register', (req, res) => {
-  const { name, age, phone, password } = req.body;
+  const { name, age, phone, password, department, assignedDoctor } = req.body;
   if (!name || age === undefined || age === null || !phone || !password) {
     return res.status(400).json({ error: 'Name, age, phone number, and password are required for registration.' });
+  }
+  if (!department || !assignedDoctor) {
+    return res.status(400).json({ error: 'Please choose a department and a doctor.' });
+  }
+  const doctor = findDoctor(assignedDoctor, department);
+  if (!doctor) {
+    return res.status(400).json({ error: 'The selected doctor is not available in that department.' });
   }
   if (typeof password !== 'string' || password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
@@ -222,9 +239,28 @@ app.post('/api/auth/register', (req, res) => {
     return res.status(409).json({ error: 'Phone number is already registered.' });
   }
 
-  const user = createPatientUser({ name, age, phone: normalizedPhone, password });
+  const user = createPatientUser({ name, age, phone: normalizedPhone, password, department, assignedDoctor: doctor.name });
+  // Registering under a clinician grants that clinician scoped consent, exactly
+  // as if the patient had granted it from the consent panel.
+  const consent = consentRegistry.grant({
+    patientId: user.patientId,
+    providerName: doctor.name,
+    providerType: 'Doctor',
+    purpose: 'Primary care coordination (selected at registration)',
+    requester: { name: 'Registration' }
+  });
+  ledger.addTransaction({
+    patientId: user.patientId,
+    author: user.name,
+    data: { type: 'consent', action: 'GRANT', consentId: consent.consentId, providerName: doctor.name, department, registration: true }
+  });
+
   const token = generateToken(user);
-  res.status(201).json({ token, user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone } });
+  res.status(201).json({
+    token,
+    user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone, department, assignedDoctor: doctor.name },
+    consent
+  });
 });
 
 // Staff (Doctor/Admin) can onboard a new patient without the patient self-registering.
@@ -242,10 +278,21 @@ app.post('/api/auth/register-patient', authenticateToken, authorizeRoles('Doctor
     return res.status(409).json({ error: 'Phone number is already registered.' });
   }
 
-  const user = createPatientUser({ name, age, phone: normalizedPhone, password });
+  const { department, assignedDoctor } = req.body;
+  if (assignedDoctor && !findDoctor(assignedDoctor, department)) {
+    return res.status(400).json({ error: 'The selected doctor is not available in that department.' });
+  }
+  const user = createPatientUser({ name, age, phone: normalizedPhone, password, department, assignedDoctor });
+  if (assignedDoctor) {
+    const consent = consentRegistry.grant({
+      patientId: user.patientId, providerName: assignedDoctor, providerType: 'Doctor',
+      purpose: 'Primary care coordination (assigned at registration)', requester: req.user
+    });
+    ledger.addTransaction({ patientId: user.patientId, author: req.user.name, data: { type: 'consent', action: 'GRANT', consentId: consent.consentId, providerName: assignedDoctor, department } });
+  }
   res.status(201).json({
     message: `Patient registered with ID ${user.patientId}.`,
-    user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone }
+    user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone, department: department || null, assignedDoctor: assignedDoctor || null }
   });
 });
 

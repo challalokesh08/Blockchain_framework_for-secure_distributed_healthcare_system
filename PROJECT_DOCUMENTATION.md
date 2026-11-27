@@ -134,6 +134,13 @@ The `isChainValid()` function checks:
 - **Fully auditable:** `EMERGENCY_REQUEST`, `EMERGENCY_APPROVED` and `EMERGENCY_REJECTED` events are sealed into the ledger as first-class transactions
 - **Patient and admin notified:** request and decision alerts appear in the in-app inbox for both roles, and the patient also receives an SMS on approval; the patient's Records page lists every emergency event against their ID
 
+### 4.9 Patient Registration with Care Assignment
+- Registration on **web and mobile** asks for a **department** first, then a **doctor belonging to that department** (from `GET /api/doctors`, derived from the 22-doctor clinical dataset)
+- The server validates that the chosen doctor really belongs to the chosen department; mismatches are rejected
+- The department and assigned doctor are stored on the patient account and returned at login
+- Registering under a doctor grants that doctor scoped consent immediately and seals the `GRANT` transaction on-chain
+- Both platforms use the same directory, so a registration made on the phone is consistent with the website
+
 ---
 
 ## 5. Technology Stack
@@ -183,7 +190,8 @@ The `isChainValid()` function checks:
 | Method | Endpoint | Auth Required | Description |
 |--------|----------|---------------|-------------|
 | POST | /api/auth/login | No | Login with phone + password |
-| POST | /api/auth/register | No | Register new patient |
+| GET | /api/doctors | No | Departments and doctors grouped by department |
+| POST | /api/auth/register | No | Register patient with department + assignedDoctor |
 | POST | /api/auth/register-patient | Doctor/Admin | Add a new patient (staff-initiated) |
 | GET | /api/status | No | Blockchain status |
 | GET | /api/ledger | Yes | Full blockchain ledger |

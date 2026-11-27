@@ -27,6 +27,13 @@ function init() {
       phone TEXT,
       patientId TEXT
     )`);
+    // Add columns for patients who registered with a department/doctor choice.
+    db.all('PRAGMA table_info(users)', [], (err, columns) => {
+      if (err) return;
+      const names = new Set((columns || []).map(c => c.name));
+      if (!names.has('department')) db.run('ALTER TABLE users ADD COLUMN department TEXT');
+      if (!names.has('assignedDoctor')) db.run('ALTER TABLE users ADD COLUMN assignedDoctor TEXT');
+    });
   });
 
   return db;
@@ -63,8 +70,8 @@ function listFilesForPatient(db, patientId) {
 
 function saveUser(db, user) {
   return new Promise((resolve, reject) => {
-    const stmt = db.prepare(`INSERT OR REPLACE INTO users (username, password, role, name, age, phone, patientId) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-    stmt.run(user.username, user.password, user.role, user.name, user.age, user.phone, user.patientId || null, function (err) {
+    const stmt = db.prepare(`INSERT OR REPLACE INTO users (username, password, role, name, age, phone, patientId, department, assignedDoctor) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    stmt.run(user.username, user.password, user.role, user.name, user.age, user.phone, user.patientId || null, user.department || null, user.assignedDoctor || null, function (err) {
       stmt.finalize();
       if (err) return reject(err);
       resolve(true);
