@@ -392,7 +392,13 @@ function Records() {
                     onClick={() => loadPatientData(p.patientId)}
                   >
                     <span className="patient-row-id">{p.patientId}</span>
-                    <span className="patient-row-name">{p.name}</span>
+                    <span className="patient-row-name">
+                      {p.name}
+                      {p.assignedToYou ? <span className="patient-row-mine"> · MY PATIENT</span> : null}
+                    </span>
+                    {(p.department || p.diagnosis) && (
+                      <span className="patient-row-meta">{p.department || '—'}{p.diagnosis ? ` · ${p.diagnosis}` : ''}</span>
+                    )}
                     <span className="patient-row-phone">{p.phone}</span>
                   </button>
                 ))}
