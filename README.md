@@ -90,6 +90,7 @@ eas build --platform android --profile preview
 
 - `preview` profile produces an installable **`.apk`** (download it from the EAS link and install on the phone — enable "install unknown apps").
 - `eas.json` is committed; `app.json` has `com.healthledger.app` package id and `runtimeVersion` policy.
+- `fallbackToCacheTimeout: 0` makes the app start from its embedded bundle immediately and fetch OTA updates in the background. If you see `failed to download remote update`, uninstall any older APK and install the **latest** build — old builds have no update channel and cannot receive bundles.
 
 **Daily workflow after setup** (every code change):
 

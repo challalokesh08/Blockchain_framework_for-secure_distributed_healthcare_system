@@ -21,7 +21,7 @@
       "enabled": true,
       "fallbackToCacheTimeout": 0,
       "url": "https://u.expo.dev/b648e10d-27d9-483d-b668-4b827686cd47",
-      "checkAutomatically": "ON_LOAD"
+      "checkAutomatically": "NEVER"
     },
     "web": {
       "favicon": "./assets/favicon.png"

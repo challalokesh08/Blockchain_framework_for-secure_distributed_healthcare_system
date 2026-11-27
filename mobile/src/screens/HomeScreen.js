@@ -1,7 +1,8 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Button, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { AuthContext } from '../AuthContext';
 import api from '../api';
+import { applyAppUpdate, checkForAppUpdate } from '../updates';
 
 export default function HomeScreen({ navigation }) {
   const { user, logout, isAuthenticated } = useContext(AuthContext);
@@ -10,6 +11,21 @@ export default function HomeScreen({ navigation }) {
 
   useEffect(() => {
     api.get('/api/status').then(r => setStatus(r.data)).catch(() => {});
+    // Background check only — a failed download is harmless here.
+    const t = setTimeout(async () => {
+      const result = await checkForAppUpdate();
+      if (result.status === 'downloaded') {
+        Alert.alert(
+          'Update ready',
+          'A new version was downloaded. Restart HealthLedger to apply it?',
+          [
+            { text: 'Later' },
+            { text: 'Restart', onPress: () => applyAppUpdate() }
+          ]
+        );
+      }
+    }, 3000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -45,6 +61,20 @@ export default function HomeScreen({ navigation }) {
           {user?.role !== 'Patient' && <View style={{ marginTop: 8 }}><Btn title="Upload File" color="#58d9a6" onPress={() => navigation.navigate('Upload')} /></View>}
           <View style={{ marginTop: 8 }}>
             <Btn title={unread ? `Notifications (${unread} new)` : 'Notifications'} color="#8ab4ff" onPress={() => navigation.navigate('Notifications')} />
+          </View>
+          <View style={{ marginTop: 8 }}>
+            <Btn title="Check for updates" color="#c9a0ff" onPress={async () => {
+              const result = await checkForAppUpdate();
+              if (result.status === 'downloaded') {
+                Alert.alert('Update ready', 'Restart to apply the new version?', [
+                  { text: 'Later' }, { text: 'Restart', onPress: () => applyAppUpdate() }
+                ]);
+              } else if (result.status === 'current') {
+                Alert.alert('Up to date', 'You are running the latest version.');
+              } else if (result.status === 'error') {
+                Alert.alert('Update check failed', 'You can keep using the app. Check again when online.');
+              }
+            }} />
           </View>
           <View style={{ marginTop: 16 }}><Btn title="Logout" color="#ff6b6b" onPress={() => logout()} /></View>
         </>
