@@ -49,7 +49,7 @@ function Records() {
   useEffect(() => {
     loadEmergency();
     // Keep emergency status in sync: an admin may approve on another device.
-    const timer = setInterval(loadEmergency, 10000);
+    const timer = setInterval(loadEmergency, 2000);
     return () => clearInterval(timer);
   }, [loadEmergency]);
 
@@ -117,7 +117,7 @@ function Records() {
 
   useEffect(() => {
     loadAccessRequests();
-    const timer = setInterval(loadAccessRequests, 10000);
+    const timer = setInterval(loadAccessRequests, 2000);
     return () => clearInterval(timer);
   }, [loadAccessRequests]);
 
@@ -147,6 +147,15 @@ function Records() {
       loadAccessRequests();
     } catch (error) {
       setAccessDecisionMsg(error.response?.data?.error || 'Unable to update the file access request.');
+    }
+  };
+
+  const viewFile = async (f) => {
+    try {
+      const res = await api.get(`/api/files/link/${encodeURIComponent(f.filename)}`);
+      window.open(res.data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Unable to open file. Please check your permissions.');
     }
   };
 
@@ -687,7 +696,10 @@ function Records() {
                     </div>
                     <p>Size: {f.size} bytes | Type: {f.mimetype}</p>
                     {f.mimetype && f.mimetype.startsWith('image/') && <ReportPhoto filename={f.filename} originalname={f.originalname} />}
-                    <p><button type="button" className="button secondary" onClick={() => downloadFile(f)}>Download</button></p>
+                    <p style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button type="button" className="button primary" onClick={() => viewFile(f)}>View</button>
+                      <button type="button" className="button secondary" onClick={() => downloadFile(f)}>Download</button>
+                    </p>
                   </article>
                 ))
               )}

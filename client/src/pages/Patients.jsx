@@ -14,7 +14,8 @@ export default function Patients() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [accessError, setAccessError] = useState('');
   const [message, setMessage] = useState('');
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState('Request to review medical records');
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const prevStatuses = useRef({});
   const selectedRef = useRef('');
@@ -67,8 +68,8 @@ export default function Patients() {
 
   useEffect(() => {
     loadPatients();
-    const t1 = setInterval(loadPatients, 10000);
-    const t2 = setInterval(loadRequests, 10000);
+    const t1 = setInterval(loadPatients, 2000);
+    const t2 = setInterval(loadRequests, 2000);
     return () => { clearInterval(t1); clearInterval(t2); };
   }, [loadPatients, loadRequests]);
 
@@ -80,14 +81,16 @@ export default function Patients() {
     loadRequests();
   };
 
-  const requestAccess = async (e) => {
-    e.preventDefault();
+  const requestAccess = async () => {
+    setConfirmOpen(false);
     if (!selectedId) return;
     setBusy(true); setMessage('');
     try {
-      const res = await api.post('/api/access-request', { patientId: selectedId, reason: reason });
+      const res = await api.post('/api/access-request', {
+        patientId: selectedId,
+        reason: reason || 'Request to review medical records'
+      });
       setMessage(res.data.message || 'Access request sent.');
-      setReason('');
       loadRequests();
     } catch (err) {
       setMessage(err.response?.data?.error || 'Unable to send the request.');
@@ -113,13 +116,22 @@ export default function Patients() {
   const download = async (f) => {
     try {
       const res = await api.get(`/api/files/${encodeURIComponent(f.filename)}`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: f.mimetype || 'application/octet-stream' }));
       const a = document.createElement('a');
       a.href = url; a.download = f.originalname || f.filename;
       document.body.appendChild(a); a.click(); a.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setMessage('Unable to download this file.');
+    }
+  };
+
+  const view = async (f) => {
+    try {
+      const res = await api.get(`/api/files/link/${encodeURIComponent(f.filename)}`);
+      window.open(res.data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setMessage(err.response?.data?.error || 'Unable to open this file.');
     }
   };
 
@@ -213,14 +225,10 @@ export default function Patients() {
                         <div className="consent-panel">
                           <h4>Permission required</h4>
                           <p className="consent-warning">{accessError}</p>
-                          <p className="consent-purpose">Send a request. The patient and administrator are both notified; you'll see records automatically once approved.</p>
-                          <form className="record-form" onSubmit={requestAccess}>
-                            <label>
-                              Reason
-                              <textarea rows="2" value={reason} onChange={e => setReason(e.target.value)} required placeholder="e.g. Follow-up consultation" />
-                            </label>
-                            <button type="submit" className="button primary" disabled={busy}>Request access</button>
-                          </form>
+                          <p className="consent-purpose">The patient and administrator are both notified; you'll see records automatically once approved.</p>
+                          <button type="button" className="button primary" disabled={busy} onClick={() => setConfirmOpen(true)}>
+                            Request access
+                          </button>
                           {selectedRequests.length > 0 && (
                             <div style={{ marginTop: '1rem' }}>
                               {selectedRequests.map(r => (
@@ -256,7 +264,10 @@ export default function Patients() {
                                   <strong>{f.originalname}</strong>
                                   <p className="consent-purpose">{f.mimetype} · {(f.size / 1024).toFixed(1)} KB</p>
                                 </div>
-                                <button type="button" className="button secondary" onClick={() => download(f)}>Download</button>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                  <button type="button" className="button primary" onClick={() => view(f)}>View</button>
+                                  <button type="button" className="button secondary" onClick={() => download(f)}>Download</button>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -270,6 +281,25 @@ export default function Patients() {
           </div>
         )}
       </div>
+
+      {confirmOpen && (
+        <div className="modal-backdrop" onClick={() => setConfirmOpen(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <h3>Request access?</h3>
+            <p className="consent-purpose">
+              Ask the patient and administrator for permission to open <strong>{selected?.name}</strong>'s records and files.
+            </p>
+            <label>
+              Reason (optional)
+              <textarea rows="2" value={reason} onChange={e => setReason(e.target.value)} />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="button secondary" onClick={() => setConfirmOpen(false)}>No, cancel</button>
+              <button type="button" className="button primary" disabled={busy} onClick={requestAccess}>Yes, request access</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

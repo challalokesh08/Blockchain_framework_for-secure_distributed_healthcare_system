@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useState } from 'react';
-import { View, Text, Button, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Button, FlatList, StyleSheet, ActivityIndicator, Linking, Alert } from 'react-native';
 import { AuthContext } from '../AuthContext';
 import api from '../api';
 
@@ -41,9 +41,18 @@ export default function RecordsScreen() {
     if (!user || !token) return undefined;
     loadRequests();
     // The request may be raised on a staff device while this screen is open.
-    const timer = setInterval(loadRequests, 10000);
+    const timer = setInterval(loadRequests, 2000);
     return () => clearInterval(timer);
   }, [loadRequests]);
+
+  const openFile = async (f) => {
+    try {
+      const res = await api.get(`/api/files/link/${encodeURIComponent(f.filename)}`);
+      await Linking.openURL(res.data.url);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Unable to open this file.');
+    }
+  };
 
   const decideRequest = async (id, approved) => {
     setDecidingId(id); setMsg('');
@@ -115,6 +124,10 @@ export default function RecordsScreen() {
               <View style={s.head}><Text style={s.author}>{f.originalname}</Text><Text style={s.date}>{new Date(f.timestamp).toLocaleDateString()}</Text></View>
               <Text style={s.text}>Type: {f.mimetype}</Text>
               <Text style={s.text}>Size: {(f.size / 1024).toFixed(1)} KB</Text>
+              <View style={s.btnRow}>
+                <Button title="View" color="#5b8ff9" onPress={() => openFile(f)} />
+                <Button title="Download" color="#58d9a6" onPress={() => openFile(f)} />
+              </View>
             </View>
           );
         }}
@@ -135,6 +148,7 @@ const s = StyleSheet.create({
   date: { fontSize: 12, color: '#888' },
   text: { fontSize: 13, color: '#ccc', marginBottom: 2 },
   hash: { fontSize: 11, color: '#666', marginTop: 6 },
+  btnRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, gap: 8 },
   sectHead: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 8 },
   muted: { fontSize: 12, color: '#888', marginBottom: 6 },
   msg: { fontSize: 12, color: '#8ab4ff', marginTop: 6 },

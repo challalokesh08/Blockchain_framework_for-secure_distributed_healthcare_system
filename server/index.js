@@ -996,6 +996,38 @@ app.get('/api/files/:filename', async (req, res) => {
   return res.status(403).json({ error: 'Patient consent required to access this file.' });
 });
 
+// Signed, expiring view link for a file. Allows the browser/mobile OS to open
+// or download a file without sending a Bearer header in a plain navigation.
+app.get('/api/files/link/:filename', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), async (req, res) => {
+  const filename = req.params.filename;
+  try {
+    const meta = await getFileMeta(db, filename);
+    if (!meta) return res.status(404).json({ error: 'File not found.' });
+    if (req.user.role === 'Patient') {
+      if (req.user.patientId !== meta.patientId) return res.status(403).json({ error: 'Not authorized to access this file.' });
+    } else if (req.user.role !== 'Admin') {
+      autoConsentIfAssigned(req.user, meta.patientId);
+      if (!consentRegistry.hasActiveConsent({ patientId: meta.patientId, requester: req.user })) {
+        return res.status(403).json({ error: 'Patient consent required to access this file.' });
+      }
+    }
+    const downloadSecret = process.env.DOWNLOAD_SECRET || process.env.JWT_SECRET || 'HealthcareJwtSecret2026!';
+    const expirySeconds = parseInt(process.env.DOWNLOAD_URL_EXPIRY || '86400', 10);
+    const token = jsonwebtoken.sign({ filename }, downloadSecret, { expiresIn: expirySeconds });
+    const base = process.env.PUBLIC_API_URL ||
+      (process.env.NODE_ENV === 'production' ? 'https://healthledger-api.onrender.com' : `${req.protocol}://${req.get('host')}`);
+    res.json({
+      url: `${base}/api/files/${encodeURIComponent(filename)}?token=${token}`,
+      filename,
+      originalname: meta.originalname,
+      mimetype: meta.mimetype
+    });
+  } catch (err) {
+    console.error('file link error', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // PoA: seal pending transactions into a block signed by a validator
 app.post('/api/mine', authenticateToken, authorizeRoles('Admin'), (req, res) => {
   const validator = req.body.validator || req.user.name || VALIDATORS[0];

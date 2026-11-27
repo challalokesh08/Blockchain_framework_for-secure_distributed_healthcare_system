@@ -144,7 +144,7 @@ Each of the 22 seeded doctors (phone `+155510010001` … `+155510010022`, passwo
 
 > **Consent demo:** Log in as a patient (e.g. `+15552100001` / `patientpass`) → **Records** page. Grant or revoke consent for any provider. A Laboratory user (`+15550000006` / `labpass`) is **blocked** from reading a patient until the patient grants consent — try it.
 >
-> **Dedicated Patients page:** navbar → **Patients** (web) or Home → **Patients** (mobile). Assigned patients appear in **My patients** with full records/files; everyone else is listed by name/ID and opens a locked view with **Request access**. The patient, admin and hospital are notified, and the records appear automatically once approved. Admins can decide pending requests on the same page.
+> **Dedicated Patients page:** navbar → **Patients** (web) or Home → **Patients** (mobile). Assigned patients appear in **My patients** with full records/files; everyone else is listed by name/ID and opens a locked view. One click on **Request access** opens a Yes/No confirmation, then the patient, admin and hospital are notified and the records appear automatically (~2 s polling) once approved. Those notifications have **Grant / Deny / Revoke access** buttons directly on them. Admins can also decide on the Patients page. Every file has **View** and **Download** options via a signed, expiring link.
 >
 > **Care-team access demo:** the Records page shows a **My patients** panel with each assigned patient's ID, department, doctor, condition and summary — sourced directly from the committed `dataset.js` used in this repo, so it appears on every deployment. Open one and records/files load immediately with no request. Any other clinician gets 403 and can use **Request file access**, which notifies the **patient, admin and hospital** in-app and by SMS; approval grants scoped consent.
 >
@@ -501,6 +501,7 @@ npm run docker-up
 | POST | `/api/records` | Staff | Add record transaction |
 | POST | `/api/files/upload` | Staff | Upload file + notify patient |
 | GET | `/api/files/:filename` | Yes / Signed URL | Download file |
+| GET | `/api/files/link/:filename` | Yes | Signed expiring View/Download URL for a file |
 | POST | `/api/mine` | Admin | Seal pending transactions into a PoA block |
 | GET | `/api/validate` | Yes | Validate chain integrity + validator set |
 | GET | `/api/contracts` | Yes | List smart contracts |

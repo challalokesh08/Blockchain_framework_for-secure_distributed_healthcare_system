@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Button, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Button, FlatList, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
 import { AuthContext } from '../AuthContext';
 import api from '../api';
 
@@ -21,7 +21,7 @@ export default function StaffRecordsScreen() {
   const [vitals, setVitals] = useState(null);
   const [emerBusy, setEmerBusy] = useState(false);
   const [accessRequests, setAccessRequests] = useState([]);
-  const [accessReason, setAccessReason] = useState('');
+  const [accessReason] = useState('Request to review medical records');
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessMsg, setAccessMsg] = useState('');
   const selectedRef = useRef(null);
@@ -44,7 +44,7 @@ export default function StaffRecordsScreen() {
       .finally(() => setLoading(false));
     loadEmergency();
     // Keep emergency status in sync: the admin may approve on another device.
-    const timer = setInterval(loadEmergency, 10000);
+    const timer = setInterval(loadEmergency, 2000);
     return () => clearInterval(timer);
   }, []);
 
@@ -86,7 +86,7 @@ export default function StaffRecordsScreen() {
 
   useEffect(() => {
     loadAccessRequests();
-    const timer = setInterval(loadAccessRequests, 10000);
+    const timer = setInterval(loadAccessRequests, 2000);
     return () => clearInterval(timer);
   }, [loadAccessRequests]);
 
@@ -94,7 +94,7 @@ export default function StaffRecordsScreen() {
     const changed = selectedRef.current?.patientId !== p.patientId;
     selectedRef.current = p;
     setSelected(p); setLoadingDetail(true); setAccessError(''); setRecords([]); setFiles([]); setVitals(null); setEmerMsg('');
-    if (changed) { setAccessReason(''); setAccessMsg(''); }
+    if (changed) { setAccessMsg(''); }
     loadEmergency();
     loadAccessRequests();
     try {
@@ -125,11 +125,19 @@ export default function StaffRecordsScreen() {
   // Indirection keeps the polling callback from capturing a stale selectPatient.
   reloadRef.current = () => selectPatient(selectedRef.current);
 
-  const requestFileAccess = async () => {
-    if (!selected || !accessReason.trim()) {
-      setAccessMsg('Please enter a reason for the access request.');
-      return;
-    }
+  const requestFileAccess = () => {
+    if (!selected) return;
+    Alert.alert(
+      'Request access?',
+      `Ask the patient and administrator for permission to open ${selected.name}'s records and files.`,
+      [
+        { text: 'No, cancel', style: 'cancel' },
+        { text: 'Yes, request', onPress: () => sendAccessRequest() }
+      ]
+    );
+  };
+
+  const sendAccessRequest = async () => {
     setAccessBusy(true); setAccessMsg('');
     try {
       const response = await api.post('/api/access-request', {
@@ -137,12 +145,20 @@ export default function StaffRecordsScreen() {
         reason: accessReason.trim()
       });
       setAccessMsg(response.data?.message || 'Access request sent to the patient.');
-      setAccessReason('');
       await loadAccessRequests();
     } catch (error) {
       setAccessMsg(error.response?.data?.error || 'Unable to submit the access request.');
     } finally {
       setAccessBusy(false);
+    }
+  };
+
+  const openFile = async (f) => {
+    try {
+      const res = await api.get(`/api/files/link/${encodeURIComponent(f.filename)}`);
+      await Linking.openURL(res.data.url);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Unable to open this file.');
     }
   };
 
@@ -296,17 +312,7 @@ export default function StaffRecordsScreen() {
         {assigned ? (
           <Text style={s.good}>Assigned care team — direct access. No permission request needed.</Text>
         ) : accessError ? (
-          <>
-            <TextInput
-              style={s.input}
-              placeholder="Reason for requesting file access"
-              placeholderTextColor="#666"
-              multiline
-              value={accessReason}
-              onChangeText={setAccessReason}
-            />
-            <Button title="Request file access" color="#5b8ff9" onPress={requestFileAccess} disabled={accessBusy} />
-          </>
+          <Button title="Request file access" color="#5b8ff9" onPress={requestFileAccess} disabled={accessBusy} />
         ) : null}
         {accessMsg ? <Text style={s.msg}>{accessMsg}</Text> : null}
       </View>
@@ -335,7 +341,7 @@ export default function StaffRecordsScreen() {
         <View style={s.headRow}>
           <Text style={s.title}>{selected.name}</Text>
           <Button title="Back" color="#888" onPress={() => {
-            selectedRef.current = null; setSelected(null); setRecords([]); setFiles([]); setAccessMsg(''); setAccessReason('');
+            selectedRef.current = null; setSelected(null); setRecords([]); setFiles([]); setAccessMsg('');
           }} />
         </View>
         <Text style={s.sub}>Patient: {selected.patientId} | {selected.phone}</Text>
@@ -377,6 +383,10 @@ export default function StaffRecordsScreen() {
                     <View style={s.head}><Text style={s.author}>{f.originalname}</Text><Text style={s.date}>{new Date(f.timestamp).toLocaleDateString()}</Text></View>
                     <Text style={s.text}>Type: {f.mimetype}</Text>
                     <Text style={s.text}>Size: {(f.size / 1024).toFixed(1)} KB</Text>
+                    <View style={s.btnRow}>
+                      <Button title="View" color="#5b8ff9" onPress={() => openFile(f)} />
+                      <Button title="Download" color="#58d9a6" onPress={() => openFile(f)} />
+                    </View>
                   </View>
                 );
               }}
