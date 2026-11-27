@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { AuthContext } from '../AuthContext';
 import api from '../api';
@@ -20,6 +20,14 @@ export default function StaffRecordsScreen() {
   const [emerMsg, setEmerMsg] = useState('');
   const [vitals, setVitals] = useState(null);
   const [emerBusy, setEmerBusy] = useState(false);
+  const [accessRequests, setAccessRequests] = useState([]);
+  const [accessReason, setAccessReason] = useState('');
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [accessMsg, setAccessMsg] = useState('');
+  const selectedRef = useRef(null);
+  const prevStatusesRef = useRef({});
+  const reloadingRef = useRef(false);
+  const reloadRef = useRef(null);
   const isDoctorOrAdmin = user?.role === 'Doctor' || user?.role === 'Admin';
   const isAdmin = user?.role === 'Admin';
 
@@ -46,9 +54,49 @@ export default function StaffRecordsScreen() {
     } catch (e) {}
   };
 
+  const loadAccessRequests = useCallback(async () => {
+    try {
+      const res = await api.get('/api/access-request');
+      const list = res.data?.requests || [];
+      setAccessRequests(list);
+      const statuses = {};
+      list.forEach(r => { statuses[r.id] = r.status; });
+      const pid = selectedRef.current?.patientId;
+      const justApproved = !!pid && list.some(r =>
+        r.patientId === pid &&
+        prevStatusesRef.current[r.id] === 'PENDING' &&
+        statuses[r.id] === 'APPROVED'
+      );
+      // Record statuses before reloading so the next poll cannot re-trigger this transition.
+      prevStatusesRef.current = statuses;
+      if (justApproved && !reloadingRef.current) {
+        reloadingRef.current = true;
+        setAccessError('');
+        setAccessMsg('File access approved — reloading records.');
+        try {
+          if (reloadRef.current) await reloadRef.current();
+        } finally {
+          reloadingRef.current = false;
+        }
+      }
+    } catch (e) {
+      // Polling is best-effort; keep the current screen usable.
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAccessRequests();
+    const timer = setInterval(loadAccessRequests, 10000);
+    return () => clearInterval(timer);
+  }, [loadAccessRequests]);
+
   const selectPatient = async (p) => {
+    const changed = selectedRef.current?.patientId !== p.patientId;
+    selectedRef.current = p;
     setSelected(p); setLoadingDetail(true); setAccessError(''); setRecords([]); setFiles([]); setVitals(null); setEmerMsg('');
+    if (changed) { setAccessReason(''); setAccessMsg(''); }
     loadEmergency();
+    loadAccessRequests();
     try {
       const rRes = await api.get('/api/records', { params: { patientId: p.patientId } });
       let fRes = { data: { files: [] } };
@@ -71,6 +119,30 @@ export default function StaffRecordsScreen() {
       }
     } finally {
       setLoadingDetail(false);
+    }
+  };
+
+  // Indirection keeps the polling callback from capturing a stale selectPatient.
+  reloadRef.current = () => selectPatient(selectedRef.current);
+
+  const requestFileAccess = async () => {
+    if (!selected || !accessReason.trim()) {
+      setAccessMsg('Please enter a reason for the access request.');
+      return;
+    }
+    setAccessBusy(true); setAccessMsg('');
+    try {
+      const response = await api.post('/api/access-request', {
+        patientId: selected.patientId,
+        reason: accessReason.trim()
+      });
+      setAccessMsg(response.data?.message || 'Access request sent to the patient.');
+      setAccessReason('');
+      await loadAccessRequests();
+    } catch (error) {
+      setAccessMsg(error.response?.data?.error || 'Unable to submit the access request.');
+    } finally {
+      setAccessBusy(false);
     }
   };
 
@@ -202,6 +274,43 @@ export default function StaffRecordsScreen() {
     );
   };
 
+  const AccessSection = ({ pid }) => {
+    const latest = accessRequests
+      .filter(r => r.patientId === pid)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    const statusStyle = latest?.status === 'APPROVED' ? s.good
+      : latest?.status === 'REJECTED' ? s.accessError : s.warn;
+    return (
+      <View style={s.card}>
+        <View style={s.btnRow}>
+          <Text style={s.sectHead}>File access</Text>
+          <Button title="Refresh" color="#5b8ff9" onPress={loadAccessRequests} disabled={accessBusy} />
+        </View>
+        {latest ? (
+          <Text style={statusStyle}>
+            Request status: {latest.status} · requester {latest.requester} · {new Date(latest.createdAt).toLocaleString()}
+          </Text>
+        ) : (
+          <Text style={s.muted}>No file access requests for this patient yet.</Text>
+        )}
+        {accessError ? (
+          <>
+            <TextInput
+              style={s.input}
+              placeholder="Reason for requesting file access"
+              placeholderTextColor="#666"
+              multiline
+              value={accessReason}
+              onChangeText={setAccessReason}
+            />
+            <Button title="Request file access" color="#5b8ff9" onPress={requestFileAccess} disabled={accessBusy} />
+          </>
+        ) : null}
+        {accessMsg ? <Text style={s.msg}>{accessMsg}</Text> : null}
+      </View>
+    );
+  };
+
   const filtered = patients.filter(p =>
     `${p.patientId} ${p.name} ${p.phone}`.toLowerCase().includes(filter.toLowerCase())
   );
@@ -215,13 +324,16 @@ export default function StaffRecordsScreen() {
       <View style={s.container}>
         <View style={s.headRow}>
           <Text style={s.title}>{selected.name}</Text>
-          <Button title="Back" color="#888" onPress={() => { setSelected(null); setRecords([]); setFiles([]); }} />
+          <Button title="Back" color="#888" onPress={() => {
+            selectedRef.current = null; setSelected(null); setRecords([]); setFiles([]); setAccessMsg(''); setAccessReason('');
+          }} />
         </View>
         <Text style={s.sub}>Patient: {selected.patientId} | {selected.phone}</Text>
         {loadingDetail ? <ActivityIndicator size="large" color="#5b8ff9" style={{ marginTop: 24 }} /> : (
           <>
             <EmergencySection pid={selected.patientId} />
             <VitalCard />
+            <AccessSection pid={selected.patientId} />
             {accessError ? (
               <>
                 <Text style={s.accessError}>{accessError}</Text>

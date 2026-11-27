@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useCallback } from 'react';
+import { useContext, useEffect, useState, useCallback, useRef } from 'react';
 import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
@@ -30,6 +30,13 @@ function Records() {
   const [emergencyRequests, setEmergencyRequests] = useState([]);
   const [emergencyMsg, setEmergencyMsg] = useState('');
   const [vitalPacket, setVitalPacket] = useState(null);
+  const [accessRequests, setAccessRequests] = useState([]);
+  const [accessRequestReason, setAccessRequestReason] = useState('');
+  const [accessRequestMsg, setAccessRequestMsg] = useState('');
+  const [accessDecisionMsg, setAccessDecisionMsg] = useState('');
+  const accessRequestsRef = useRef([]);
+  const selectedPatientRef = useRef(null);
+  const loadPatientDataRef = useRef(null);
 
   const canAddPatient = isStaff && (user?.role === 'Doctor' || user?.role === 'Admin');
 
@@ -83,6 +90,65 @@ function Records() {
       loadPatientData(user.patientId);
     }
   }, [isStaff, user, loadPatientData]);
+
+  // Refs keep the 10s polling callback pointed at the patient on screen
+  // without rebuilding the interval on every selection change.
+  useEffect(() => { selectedPatientRef.current = selectedPatientId; }, [selectedPatientId]);
+  useEffect(() => { loadPatientDataRef.current = loadPatientData; }, [loadPatientData]);
+
+  const loadAccessRequests = useCallback(() => {
+    api.get('/api/access-request')
+      .then(r => {
+        const requests = r.data.requests || [];
+        const previousStatuses = new Map(accessRequestsRef.current.map(req => [req.id, req.status]));
+        requests.forEach(req => {
+          if (previousStatuses.get(req.id) === 'PENDING' && req.status === 'APPROVED' &&
+              req.patientId === selectedPatientRef.current) {
+            // Approval grants consent automatically, so the denied view is stale.
+            setAccessMessage('');
+            if (loadPatientDataRef.current) loadPatientDataRef.current(req.patientId);
+          }
+        });
+        accessRequestsRef.current = requests;
+        setAccessRequests(requests);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadAccessRequests();
+    const timer = setInterval(loadAccessRequests, 10000);
+    return () => clearInterval(timer);
+  }, [loadAccessRequests]);
+
+  const submitAccessRequest = async (event) => {
+    event.preventDefault();
+    if (!selectedPatientId) return;
+    setAccessRequestMsg('');
+    try {
+      const response = await api.post('/api/access-request', {
+        patientId: selectedPatientId,
+        reason: accessRequestReason
+      });
+      setAccessRequestMsg(response.data.message || 'File access request sent.');
+      setAccessRequestReason('');
+      loadAccessRequests();
+    } catch (error) {
+      setAccessRequestMsg(error.response?.data?.error || 'Unable to send the file access request.');
+    }
+  };
+
+  const confirmAccessRequest = async (id, approved) => {
+    setAccessDecisionMsg('');
+    try {
+      const response = await api.post(`/api/access-request/confirm/${id}`, { approved });
+      setAccessDecisionMsg(response.data.message || `File access request ${approved ? 'approved' : 'rejected'}.`);
+      if (!isStaff && user?.patientId) loadConsents(user.patientId);
+      loadAccessRequests();
+    } catch (error) {
+      setAccessDecisionMsg(error.response?.data?.error || 'Unable to update the file access request.');
+    }
+  };
 
   const downloadFile = async (f) => {
     try {
@@ -231,6 +297,10 @@ function Records() {
     }
   };
 
+  const pendingAccessRequests = accessRequests.filter(r => r.status === 'PENDING');
+  const pendingPatientAccessRequests = pendingAccessRequests.filter(r => r.patientId === user?.patientId);
+  const selectedAccessRequests = accessRequests.filter(r => r.patientId === selectedPatientId);
+
   const pendingRequest = emergencyRequests.find(r => r.patientId === selectedPatientId && r.status === 'PENDING');
   const activeUnlock = emergencyRequests.find(r =>
     r.patientId === selectedPatientId &&
@@ -305,6 +375,35 @@ function Records() {
                 ))}
               </div>
               {accessMessage && <p className="consent-warning">{accessMessage}</p>}
+              {isStaff && selectedPatientId && (
+                <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
+                  <h4>Request file access</h4>
+                  <p className="consent-purpose">
+                    Ask {selectedPatient ? `${selectedPatient.name} (${selectedPatient.patientId})` : selectedPatientId} for permission to open their files. Approval grants scoped consent automatically.
+                  </p>
+                  <form className="record-form" onSubmit={submitAccessRequest}>
+                    <label>
+                      Reason
+                      <textarea rows="2" value={accessRequestReason} onChange={e => setAccessRequestReason(e.target.value)} required placeholder="e.g. Follow-up review of lab reports" />
+                    </label>
+                    <button type="submit" className="button primary">Request file access</button>
+                  </form>
+                  {accessRequestMsg && <p className="form-message">{accessRequestMsg}</p>}
+                  {selectedAccessRequests.length > 0 && (
+                    <div style={{ marginTop: '1rem' }}>
+                      {selectedAccessRequests.map(r => (
+                        <div key={r.id} className="consent-row">
+                          <div>
+                            <strong>{r.id}</strong> — <span className={`status-pill ${r.status === 'APPROVED' ? 'success' : r.status === 'REJECTED' ? 'revoked' : 'warning'}`}>{r.status}</span>
+                            <p className="consent-purpose">{r.reason}</p>
+                          </div>
+                          <span className="consent-purpose">{new Date(r.createdAt).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {canAddPatient && selectedPatient && (
                 <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
                   <h4>Emergency access (break-glass)</h4>
@@ -361,6 +460,27 @@ function Records() {
                       </div>
                     ))}
                   {emergencyMsg && <p className="form-message">{emergencyMsg}</p>}
+                </div>
+              )}
+              {user?.role === 'Admin' && (
+                <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
+                  <h4>File access requests — approval</h4>
+                  {pendingAccessRequests.length === 0
+                    ? <p className="consent-purpose">No pending file access requests.</p>
+                    : pendingAccessRequests.map(r => (
+                      <div key={r.id} className="consent-row">
+                        <div>
+                          <strong>{r.patientId}</strong> — {r.requester || r.name} ({r.role})
+                          <p className="consent-purpose">{r.reason}</p>
+                          <p className="consent-purpose">Requested {new Date(r.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button type="button" className="button primary" onClick={() => confirmAccessRequest(r.id, true)}>Approve</button>
+                          <button type="button" className="button secondary" onClick={() => confirmAccessRequest(r.id, false)}>Reject</button>
+                        </div>
+                      </div>
+                    ))}
+                  {accessDecisionMsg && <p className="form-message">{accessDecisionMsg}</p>}
                 </div>
               )}
               {selectedPatient && (
@@ -438,6 +558,26 @@ function Records() {
                     ))
                   )}
                 </div>
+              </div>
+              <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
+                <h4>File access requests</h4>
+                <p>Approve or reject providers asking to open your medical files. Approval grants them scoped consent automatically.</p>
+                {pendingPatientAccessRequests.length === 0
+                  ? <p className="consent-purpose">No pending file access requests.</p>
+                  : pendingPatientAccessRequests.map(r => (
+                    <div key={r.id} className="consent-row">
+                      <div>
+                        <strong>{r.requester || r.name}</strong> ({r.role})
+                        <p className="consent-purpose">{r.reason}</p>
+                        <p className="consent-purpose">Requested {new Date(r.createdAt).toLocaleString()}</p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button type="button" className="button primary" onClick={() => confirmAccessRequest(r.id, true)}>Approve</button>
+                        <button type="button" className="button secondary" onClick={() => confirmAccessRequest(r.id, false)}>Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                {accessDecisionMsg && <p className="form-message">{accessDecisionMsg}</p>}
               </div>
               <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
                 <h4>Emergency access events</h4>

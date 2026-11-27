@@ -1,45 +1,69 @@
 import { useEffect, useState, useContext } from 'react';
-import api, { apiBase } from '../api.js';
+import { useNavigate } from 'react-router-dom';
+import api from '../api.js';
 import { AuthContext } from '../AuthContext.jsx';
 
 export default function Notifications() {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!user) return;
-    const pid = user.patientId || '';
     let mounted = true;
     async function fetchNotifications() {
       try {
-        const res = await api.get('/api/records', { params: { patientId: pid } });
-        const records = res.data.records || [];
-        const filesRes = await api.get('/api/files', { params: { patientId: pid } });
-        const files = filesRes.data.files || [];
-        if (mounted) setNotifications([...records.map(r=>({type:'record',data:r})), ...files.map(f=>({type:'file',data:f}))]);
+        const res = await api.get('/api/notifications');
+        if (mounted) setNotifications(res.data.notifications || []);
       } catch (err) {
-        // ignore
+        // ignore transient failures; the next poll retries
       }
     }
     fetchNotifications();
-    const id = setInterval(fetchNotifications, 30000);
+    const id = setInterval(fetchNotifications, 15000);
     return () => { mounted = false; clearInterval(id); };
   }, [user]);
+
+  const openNotification = async (n) => {
+    if (!n.read) {
+      try {
+        const res = await api.post('/api/notifications/read', { id: n.id });
+        const updated = res.data.notification || { ...n, read: true };
+        setNotifications(prev => prev.map(item => item.id === n.id ? updated : item));
+      } catch (err) {
+        setMessage(err.response?.data?.error || 'Unable to mark the notification as read.');
+      }
+    }
+    if (n.link) navigate(n.link);
+  };
 
   if (!user) return null;
 
   return (
     <div className="notifications-panel">
       <h4>Notifications</h4>
-      {notifications.length === 0 ? <p>No recent items.</p> : (
+      {message && <p className="form-message">{message}</p>}
+      {notifications.length === 0 ? (
+        <p>No notifications yet. Updates about access requests will appear here.</p>
+      ) : (
         <ul>
-          {notifications.map((n, idx) => (
-            <li key={idx} className="notification-item">
-              {n.type === 'record' ? (
-                <div><strong>Record:</strong> {n.data.data?.diagnosis || n.data.data?.summary || 'New record'}</div>
-              ) : (
-                <div><strong>File:</strong> <a href={`${apiBase}/api/files/${encodeURIComponent(n.data.filename)}`} target="_blank" rel="noreferrer">{n.data.originalname}</a></div>
-              )}
+          {notifications.map((n) => (
+            <li key={n.id} className="notification-item">
+              <button
+                type="button"
+                onClick={() => openNotification(n)}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}
+              >
+                <div>
+                  <strong>{n.title}</strong>
+                  {!n.read && <span className="status-pill warning" style={{ marginLeft: '0.5rem' }}>New</span>}
+                </div>
+                <p className="consent-purpose">{n.body}</p>
+                <p className="consent-purpose">
+                  {n.actor ? `From ${n.actor} · ` : ''}{new Date(n.createdAt).toLocaleString()}
+                </p>
+              </button>
             </li>
           ))}
         </ul>

@@ -5,7 +5,7 @@ const cors = require('cors');
 const jsonwebtoken = require('jsonwebtoken');
 const { Blockchain, PatientRecordTransaction, VALIDATORS, roleForValidator } = require('./blockchain');
 const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients, seedPatient, seedDoctor, loadPersistedUsers, loadExtraSeedUsers, setDb, STAFF_ROLES } = require('./auth');
-const { getUserByPatientId } = require('./auth');
+const { getUserByPatientId, getUsersByRole, getUserByName } = require('./auth');
 const { sendSMS } = require('./notifications');
 const multer = require('multer');
 const fs = require('fs');
@@ -41,6 +41,8 @@ if (fs.existsSync(metadataFile)) {
 const { ContractEngine } = require('./contracts');
 const { ConsentRegistry } = require('./consent');
 const { EmergencyRegistry } = require('./emergency');
+const { AccessRequestRegistry } = require('./access-requests');
+const { NotificationRegistry } = require('./notification-registry');
 const { deriveVitals } = require('./vitals');
 
 const app = express();
@@ -49,9 +51,50 @@ const ledger = new Blockchain();
 const contractEngine = new ContractEngine(ledger);
 const consentRegistry = new ConsentRegistry();
 const emergencyRegistry = new EmergencyRegistry();
+const accessRequestRegistry = new AccessRequestRegistry();
+const notificationRegistry = new NotificationRegistry();
 
 const STAFF_OR_PATIENT = [...STAFF_ROLES, 'Patient'];
 const WRITE_ROLES = ['Doctor', 'Nurse', 'Admin', 'Hospital', 'Laboratory'];
+
+// One notification is delivered to an in-app inbox (all roles) and, where a
+// phone number exists, as an SMS via Twilio (or the local file fallback).
+function notify({ recipients = [], smsTo = [], type = 'info', title, body, patientId = null, requestId = null, link = null, actor = null }) {
+  const notification = notificationRegistry.add({ recipients, type, title, body, patientId, requestId, link, actor });
+  const seen = new Set();
+  for (const to of smsTo) {
+    if (!to || seen.has(to)) continue;
+    seen.add(to);
+    sendSMS(to, `${title}: ${body}`).catch(() => {});
+  }
+  return notification;
+}
+
+function notifyPatient(patientId, details) {
+  const patient = getUserByPatientId(patientId);
+  notify({
+    recipients: [{ role: 'Patient', patientId }],
+    smsTo: patient ? [patient.phone] : [],
+    ...details
+  });
+}
+
+function notifyAdmins(details) {
+  notify({
+    recipients: [{ role: 'Admin' }],
+    smsTo: getUsersByRole('Admin').map(u => u.phone),
+    ...details
+  });
+}
+
+function notifyStaffByName(name, details) {
+  const user = getUserByName(name);
+  notify({
+    recipients: [{ role: 'Staff', name }],
+    smsTo: user ? [user.phone] : [],
+    ...details
+  });
+}
 
 // Seed 110 patients + medical records + image files + doctors + consents on startup so data persists across redeploys
 (async () => {
@@ -264,6 +307,142 @@ app.delete('/api/consent', authenticateToken, authorizeRoles('Patient'), (req, r
   }
 });
 
+// File access requests: a clinician asks, the patient (or admin) decides, and
+// approval grants scoped consent so the clinician can actually open the files.
+const ACCESS_PROVIDER_TYPE = {
+  Doctor: 'Doctor', Nurse: 'Hospital', Hospital: 'Hospital',
+  Laboratory: 'Laboratory', Insurance: 'Insurance', Admin: 'Doctor'
+};
+
+app.post('/api/access-request', authenticateToken, authorizeRoles(...STAFF_ROLES), (req, res) => {
+  const { patientId, reason } = req.body || {};
+  if (!patientId) return res.status(400).json({ error: 'patientId is required.' });
+  const request = accessRequestRegistry.create({
+    patientId,
+    requester: { name: req.user.name, role: req.user.role },
+    reason: reason || 'Request to review medical files' // registry stores requester.name as a string
+  });
+  try {
+    ledger.addTransaction({
+      patientId,
+      author: req.user.name,
+      data: { type: 'file-access', action: 'FILE_ACCESS_REQUEST', requestId: request.id, requester: request.requester, role: request.role, reason: request.reason, status: 'PENDING' }
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  notifyPatient(patientId, {
+    type: 'file_request',
+    title: 'File access request',
+    body: `${req.user.name} (${req.user.role}) requested access to your medical files. Reason: ${request.reason}`,
+    patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+  notifyAdmins({
+    type: 'file_request',
+    title: 'File access request',
+    body: `${req.user.name} (${req.user.role}) requested access to ${patientId}'s files. Reason: ${request.reason}`,
+    patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+
+  res.status(201).json({ message: 'Request sent to the patient and administrator.', request });
+});
+
+app.get('/api/access-request', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (req, res) => {
+  res.json({ requests: accessRequestRegistry.listFor(req.user) });
+});
+
+app.post('/api/access-request/confirm/:id', authenticateToken, authorizeRoles('Patient', 'Admin'), (req, res) => {
+  const request = accessRequestRegistry.get(req.params.id);
+  if (!request) return res.status(404).json({ error: 'File access request not found.' });
+  if (req.user.role === 'Patient' && request.patientId !== req.user.patientId) {
+    return res.status(403).json({ error: 'Patients may only decide requests for their own records.' });
+  }
+  const approved = req.body && req.body.approved !== false;
+  let consent = null;
+  if (approved) {
+    try {
+      consent = consentRegistry.grant({
+        patientId: request.patientId,
+        providerName: request.requester,
+        providerType: ACCESS_PROVIDER_TYPE[request.role] || 'Doctor',
+        purpose: request.reason,
+        requester: req.user
+      });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  let decided;
+  try {
+    decided = accessRequestRegistry.decide(request.id, { approved, user: req.user, consentId: consent?.consentId || null });
+    ledger.addTransaction({
+      patientId: request.patientId,
+      author: req.user.name,
+      data: {
+        type: 'file-access',
+        action: approved ? 'FILE_ACCESS_APPROVED' : 'FILE_ACCESS_REJECTED',
+        requestId: request.id,
+        requester: request.requester,
+        decidedBy: req.user.name,
+        consentId: consent?.consentId || null
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+
+  const outcome = approved ? 'approved' : 'rejected';
+  const message = `File access request ${request.id} ${outcome}${approved ? ' — consent is now active.' : '.'}`;
+  notifyStaffByName(request.requester, {
+    type: 'file_decision',
+    title: `File access ${outcome}`,
+    body: `Your request for ${request.patientId}'s files was ${outcome} by ${req.user.name}.`,
+    patientId: request.patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+  notifyPatient(request.patientId, {
+    type: 'file_decision',
+    title: `File access ${outcome}`,
+    body: `You ${outcome} ${request.requester}'s request${approved ? '. Their consent is active.' : '.'}`,
+    patientId: request.patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+  notifyAdmins({
+    type: 'file_decision',
+    title: `File access ${outcome}`,
+    body: `${req.user.name} ${outcome} ${request.requester}'s file access request for ${request.patientId}.`,
+    patientId: request.patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+
+  res.json({ message, request: decided, consent });
+});
+
+// In-app notification inbox (SMS delivery is handled by notify() above).
+app.get('/api/notifications', authenticateToken, (req, res) => {
+  res.json({ notifications: notificationRegistry.listFor(req.user) });
+});
+
+app.post('/api/notifications/read', authenticateToken, (req, res) => {
+  const n = notificationRegistry.markRead(req.body?.id, req.user);
+  if (!n) return res.status(404).json({ error: 'Notification not found.' });
+  res.json({ notification: n });
+});
+
 // Emergency (break-glass) access: doctor requests, admin approves (2-of-2), time-boxed, vital scope only, fully audited on-chain.
 app.get('/api/emergency', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (req, res) => {
   const { role, name, patientId } = req.user;
@@ -296,6 +475,26 @@ app.post('/api/emergency/request', authenticateToken, authorizeRoles('Doctor', '
   } catch (error) {
     return res.status(500).json({ error: error.message });
   }
+
+  notifyPatient(patientId, {
+    type: 'emergency_request',
+    title: 'Emergency access requested',
+    body: `${req.user.name} requested a time-boxed emergency unlock of your vital information. Reason: ${reason} (triage ${triage}). An admin must approve it.`,
+    patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+  notifyAdmins({
+    type: 'emergency_request',
+    title: 'Emergency unlock approval needed',
+    body: `${req.user.name} requested emergency access to ${patientId}'s vital information. Reason: ${reason} (triage ${triage}).`,
+    patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+
   res.status(201).json({ message: 'Emergency access request logged. An admin must approve it before any access is granted.', request });
 });
 
@@ -318,6 +517,7 @@ app.post('/api/emergency/confirm/:id', authenticateToken, authorizeRoles('Admin'
     return res.status(500).json({ error: error.message });
   }
 
+  const outcome = approved ? 'approved' : 'rejected';
   const patientUser = getUserByPatientId(request.patientId);
   if (patientUser && patientUser.phone) {
     const message = approved
@@ -325,6 +525,41 @@ app.post('/api/emergency/confirm/:id', authenticateToken, authorizeRoles('Admin'
       : `HealthLedger notice: an emergency access request by ${request.doctor} was reviewed and not approved.`;
     sendSMS(patientUser.phone, message).catch(() => {});
   }
+  // In-app copies (SMS above avoids wording duplication).
+  notificationRegistry.add({
+    recipients: [{ role: 'Patient', patientId: request.patientId }],
+    type: 'emergency_decision',
+    title: `Emergency access ${outcome}`,
+    body: approved
+      ? `Your vital information is unlocked for ${request.doctor} until ${request.unlockExpiresAt}.`
+      : `${request.doctor}'s emergency request was not approved.`,
+    patientId: request.patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+  notificationRegistry.add({
+    recipients: [{ role: 'Staff', name: request.doctor }],
+    type: 'emergency_decision',
+    title: `Emergency access ${outcome}`,
+    body: approved
+      ? `Your emergency unlock for ${request.patientId} is active until ${request.unlockExpiresAt}. Vital information only.`
+      : `Your emergency request for ${request.patientId} was rejected by ${req.user.name}.`,
+    patientId: request.patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+  notificationRegistry.add({
+    recipients: [{ role: 'Admin' }],
+    type: 'emergency_decision',
+    title: `Emergency access ${outcome}`,
+    body: `${req.user.name} ${outcome} ${request.doctor}'s emergency request for ${request.patientId}.`,
+    patientId: request.patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
 
   res.json({
     message: approved
@@ -355,6 +590,9 @@ app.get('/api/records', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), 
       const unlock = emergencyRegistry.getActiveUnlock(requestedPatientId);
       if (!unlock) {
         return res.status(403).json({ error: `No active emergency unlock for ${requestedPatientId}. Emergency access requires a doctor's request and an admin's approval.` });
+      }
+      if (unlock.doctor !== req.user.name) {
+        return res.status(403).json({ error: 'This emergency unlock was requested by another clinician. Only the requesting clinician may use it.' });
       }
     } else if (!consentRegistry.hasActiveConsent({ patientId: requestedPatientId, requester: req.user })) {
       return res.status(403).json({ error: `Patient consent required. No active consent for ${requestedPatientId} authorizing ${req.user.role}.` });

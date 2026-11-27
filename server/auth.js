@@ -52,6 +52,14 @@ function getUserByPatientId(patientId) {
   return users.find(user => user.patientId === patientId);
 }
 
+function getUsersByRole(role) {
+  return users.filter(user => user.role === role);
+}
+
+function getUserByName(name) {
+  return users.find(user => user.name && user.name.toLowerCase() === String(name || '').toLowerCase());
+}
+
 function verifyPassword(user, rawPassword) {
   if (!user || !user.password) {
     return false;
@@ -202,6 +210,8 @@ module.exports = {
   findUser,
   findUserByPhone,
   getUserByPatientId,
+  getUsersByRole,
+  getUserByName,
   verifyPassword,
   generateToken,
   authenticateToken,

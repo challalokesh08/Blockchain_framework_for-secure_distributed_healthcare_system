@@ -19,6 +19,10 @@ Blockchain_framework_for-secure_distributed_healthcare_system/
 │   ├── blockchain.js       # Blockchain, Block, AES encryption
 │   ├── auth.js             # JWT auth, role-based access control
 │   ├── contracts.js        # Smart contract engine
+│   ├── consent.js          # Patient-controlled consent registry
+│   ├── emergency.js        # Break-glass request/time-box registry
+│   ├── access-requests.js  # File-access request registry
+│   ├── notification-registry.js # Role-scoped in-app notification inbox
 │   ├── db.js               # SQLite for file metadata
 │   └── notifications.js    # Twilio SMS + file fallback
 ├── client/                 # React + Vite frontend
@@ -109,10 +113,12 @@ The `isChainValid()` function checks:
 - File metadata stored in SQLite database
 - Patients notified via SMS when files are uploaded
 
-### 4.6 SMS Notifications
-- Twilio integration for real-time patient alerts
-- Falls back to local file logging when Twilio is not configured
-- Notifications sent on record creation and file upload
+### 4.6 Notifications & File-Access Requests
+- Twilio integration for real-time SMS alerts; falls back to local file logging in `server/notifications/` when Twilio is not configured
+- **In-app inbox** (`/api/notifications`) shows role-scoped alerts on web and mobile: file-access requests, their outcomes, and emergency unlocks
+- A clinician who lacks consent can **request file access** with a reason. Both the **patient and the admin** are notified (in-app + SMS). The patient (or admin, for oversight) approves or rejects; approval grants scoped consent automatically so the clinician can open records/files, and the doctor's screen refreshes within ~10 seconds
+- Every request and decision is written to the ledger (`FILE_ACCESS_REQUEST`, `FILE_ACCESS_APPROVED`, `FILE_ACCESS_REJECTED`)
+- Patients cannot decide requests belonging to other patients; emergency vitals may only be used by the clinician who requested the unlock
 
 ### 4.7 Blockchain Explorer
 - Visual browser for all blocks in the ledger
@@ -126,7 +132,7 @@ The `isChainValid()` function checks:
 - **Least privilege:** an approved unlock exposes only the *vital packet* (blood type, allergies, medications, chronic conditions) — full medical history stays locked, even for Admin-normal reads
 - **Time-boxed:** unlock auto-expires after 30 minutes; unapproved requests expire after 60 minutes
 - **Fully auditable:** `EMERGENCY_REQUEST`, `EMERGENCY_APPROVED` and `EMERGENCY_REJECTED` events are sealed into the ledger as first-class transactions
-- **Patient notified:** an SMS alert is sent immediately on approval, and the patient's Records page lists every emergency event against their ID
+- **Patient and admin notified:** request and decision alerts appear in the in-app inbox for both roles, and the patient also receives an SMS on approval; the patient's Records page lists every emergency event against their ID
 
 ---
 
@@ -185,6 +191,11 @@ The `isChainValid()` function checks:
 | GET | /api/records?patientId=X&emergency=1 | Staff (with active unlock) | Get vital-packet only for emergency |
 | POST | /api/records | Doctor/Nurse/Admin | Add record transaction |
 | POST | /api/records/with-report | Doctor/Nurse/Admin | Add record with optional report photo + lab |
+| POST | /api/access-request | Staff | Request file access; notifies patient + admin |
+| GET | /api/access-request | Yes | List file-access requests (role-scoped) |
+| POST | /api/access-request/confirm/:id | Patient/Admin | Approve (grants consent) or reject a file request |
+| GET | /api/notifications | Yes | In-app notification inbox |
+| POST | /api/notifications/read | Yes | Mark an in-app notification as read |
 | POST | /api/emergency/request | Doctor/Admin | Raise an emergency (break-glass) access request |
 | POST | /api/emergency/confirm/:id | Admin | Approve or reject an emergency request |
 | GET | /api/emergency | Yes | List emergency requests (role-scoped) |
@@ -283,7 +294,8 @@ Patient Data (plaintext)
 - **Signed download URLs** with configurable expiry for file access
 - **CORS enabled** for cross-origin API access
 - **Environment variables** for secrets (ENCRYPTION_KEY, JWT_SECRET)
-- **Break-glass emergency access** — two-party (doctor + admin) time-boxed, vital-scope-only unlock with full on-chain audit and patient SMS notification
+- **Patient-controlled file requests** — no access without an explicit decision; patient or admin approves, consent is scoped to the named clinician, and the requester's app auto-refreshes on approval
+- **Break-glass emergency access** — two-party (doctor + admin) time-boxed, vital-scope-only unlock usable only by the requesting clinician, with full on-chain audit and patient/admin notifications
 
 ---
 

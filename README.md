@@ -141,6 +141,12 @@ Each of the 22 seeded doctors (phone `+155510010001` … `+155510010022`, passwo
 
 > **Consent demo:** Log in as a patient (e.g. `+15552100001` / `patientpass`) → **Records** page. Grant or revoke consent for any provider. A Laboratory user (`+15550000006` / `labpass`) is **blocked** from reading a patient until the patient grants consent — try it.
 >
+> **File-access request demo (patient-controlled):**
+> 1. Login as a doctor (`+15550000001` / `doctorpass`) → **Records** → pick a patient you have no consent for → try to read (403).
+> 2. Click **Request file access**, enter a reason and submit. Both the **patient** and the **admin** are notified in-app (inbox / Notifications page) and by SMS (or `server/notifications/` locally).
+> 3. Login as the patient (`+916305363032` / `patientpass`) → **File access requests** → **Approve** (or as Admin → **File access requests — approval**).
+> 4. Back as the doctor: records and files load automatically within ~10 s (no manual reload). Only the requesting clinician gets access; the decision is recorded on-chain.
+>
 > **PoA demo:** Admin can seal pending transactions into a block via `POST /api/mine`. Blocks show the sealed-by validator and signature.
 
 > **Break-glass (emergency access) demo:**
@@ -425,6 +431,8 @@ Blockchain_framework_for-secure_distributed_healthcare_system/
 - **Off-chain Storage, On-chain Proof** — only hashes + metadata live on the ledger; full encrypted payloads live off-chain
 - **Proof-of-Authority Consensus** — blocks are sealed by a rotating set of trusted validators; no energy-heavy mining
 - **Patient-Controlled Consent** — smart-contract enforced, grant/revoke access per provider; revoked instantly blocks reads
+- **File-Access Requests** — clinician requests access → patient **or** admin approves → scoped consent; both parties are notified in-app and by SMS
+- **In-App Notifications** — role-scoped inbox for file requests, approvals and emergency unlocks (web + mobile)
 - **Role-Based Access** — Doctor, Nurse, Hospital, Laboratory, Insurance, Admin, and Patient roles with JWT authentication
 - **File Upload** — Signed download URLs for secure file sharing with consent-aware access
 - **SMS Notifications** — Twilio integration with local file fallback
@@ -463,6 +471,14 @@ npm run docker-up
 | GET | `/api/consent` | Yes | List consents for a patient |
 | POST | `/api/consent` | Patient | Patient grants consent to a provider |
 | DELETE | `/api/consent` | Patient | Patient revokes consent |
+| POST | `/api/access-request` | Staff | Request file access; notifies patient + admin |
+| GET | `/api/access-request` | Yes | List access requests (patient/admin/doctor-scoped) |
+| POST | `/api/access-request/confirm/:id` | Patient/Admin | Approve (grants consent) or reject a file request |
+| GET | `/api/notifications` | Yes | In-app notification inbox |
+| POST | `/api/notifications/read` | Yes | Mark an in-app notification as read |
+| GET | `/api/emergency` | Yes | List break-glass requests (role-scoped) |
+| POST | `/api/emergency/request` | Doctor/Admin | Raise a vital-only unlock request |
+| POST | `/api/emergency/confirm/:id` | Admin | Approve/reject emergency unlock |
 | GET | `/api/records?patientId=P-2001` | Yes | Patient records (consent-gated) |
 | POST | `/api/records` | Staff | Add record transaction |
 | POST | `/api/files/upload` | Staff | Upload file + notify patient |
