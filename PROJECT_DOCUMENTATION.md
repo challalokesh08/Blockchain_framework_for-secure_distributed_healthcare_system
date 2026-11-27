@@ -116,7 +116,8 @@ The `isChainValid()` function checks:
 ### 4.6 Notifications & File-Access Requests
 - Twilio integration for real-time SMS alerts; falls back to local file logging in `server/notifications/` when Twilio is not configured
 - **In-app inbox** (`/api/notifications`) shows role-scoped alerts on web and mobile: file-access requests, their outcomes, and emergency unlocks
-- A clinician who lacks consent can **request file access** with a reason. Both the **patient and the admin** are notified (in-app + SMS). The patient (or admin, for oversight) approves or rejects; approval grants scoped consent automatically so the clinician can open records/files, and the doctor's screen refreshes within ~10 seconds
+- A clinician who lacks consent can **request file access** with a reason. The **patient, admin and hospital** are notified (in-app + SMS). The patient (or admin, for oversight) approves or rejects; approval grants scoped consent automatically so the clinician can open records/files, and the doctor's screen refreshes within ~10 seconds
+- The patient's **assigned clinician** (doctor/nurse) and hospital get direct access without a request: `/api/patients` exposes `doctor`, `department` and `hospital`, and consent is auto-granted (and sealed on-chain) when the assigned clinician opens the chart. Revoked assignment consent is re-granted automatically for the care team
 - Every request and decision is written to the ledger (`FILE_ACCESS_REQUEST`, `FILE_ACCESS_APPROVED`, `FILE_ACCESS_REJECTED`)
 - Patients cannot decide requests belonging to other patients; emergency vitals may only be used by the clinician who requested the unlock
 

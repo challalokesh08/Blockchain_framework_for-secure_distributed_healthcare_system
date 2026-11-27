@@ -97,6 +97,61 @@ function notifyStaffByName(name, details) {
   });
 }
 
+function notifyHospitals(details) {
+  notify({
+    recipients: [{ role: 'Hospital' }],
+    smsTo: getUsersByRole('Hospital').map(u => u.phone),
+    ...details
+  });
+}
+
+// Who owns a patient's care? Registration stores it; seeded patients inherit
+// it from their clinical record. Used to give the assigned clinician automatic
+// access instead of making them ask for permission.
+function patientAssignment(patientId) {
+  const user = getUserByPatientId(patientId);
+  const rec = ledger.getPatientRecords(patientId).find(r =>
+    r.data && (r.data.physician || r.data.department || r.data.hospital)
+  );
+  return {
+    doctor: user?.assignedDoctor || rec?.data?.physician || null,
+    department: user?.department || rec?.data?.department || null,
+    hospital: rec?.data?.hospital || rec?.data?.lab || null
+  };
+}
+
+function isAssignedClinician(user, patientId) {
+  if (user.role === 'Admin') return true;
+  const a = patientAssignment(patientId);
+  const name = String(user.name || '').toLowerCase();
+  if (user.role === 'Doctor' || user.role === 'Nurse') {
+    return !!a.doctor && a.doctor.toLowerCase() === name;
+  }
+  if (user.role === 'Hospital') {
+    const org = String(user.organization || user.name || '').toLowerCase();
+    return !!a.hospital && (a.hospital.toLowerCase() === name || a.hospital.toLowerCase() === org);
+  }
+  return false;
+}
+
+function autoConsentIfAssigned(user, patientId) {
+  if (user.role === 'Admin' || !isAssignedClinician(user, patientId)) return false;
+  const providerType = ACCESS_PROVIDER_TYPE[user.role] || 'Doctor';
+  const consent = consentRegistry.grant({
+    patientId,
+    providerName: user.name,
+    providerType,
+    purpose: 'Assigned care team — automatic access',
+    requester: { name: 'System (care assignment)' }
+  });
+  ledger.addTransaction({
+    patientId,
+    author: user.name,
+    data: { type: 'consent', action: 'GRANT', consentId: consent.consentId, providerName: user.name, automatic: true }
+  });
+  return true;
+}
+
 // Seed 110 patients + medical records + image files + doctors + consents on startup so data persists across redeploys
 (async () => {
   try {
@@ -371,7 +426,8 @@ app.get('/api/ledger', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (
 });
 
 app.get('/api/patients', authenticateToken, authorizeRoles(...STAFF_ROLES), (req, res) => {
-  res.json({ patients: getAllPatients() });
+  const patients = getAllPatients().map(p => ({ ...p, ...patientAssignment(p.patientId) }));
+  res.json({ patients });
 });
 
 // Consent: patient-controlled access management
@@ -459,8 +515,17 @@ app.post('/api/access-request', authenticateToken, authorizeRoles(...STAFF_ROLES
     link: '/records',
     actor: req.user.name
   });
+  notifyHospitals({
+    type: 'file_request',
+    title: 'File access request',
+    body: `${req.user.name} (${req.user.role}) requested access to ${patientId}'s files. Reason: ${request.reason}`,
+    patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
 
-  res.status(201).json({ message: 'Request sent to the patient and administrator.', request });
+  res.status(201).json({ message: 'Request sent to the patient, administrator and hospital.', request });
 });
 
 app.get('/api/access-request', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (req, res) => {
@@ -529,6 +594,15 @@ app.post('/api/access-request/confirm/:id', authenticateToken, authorizeRoles('P
     actor: req.user.name
   });
   notifyAdmins({
+    type: 'file_decision',
+    title: `File access ${outcome}`,
+    body: `${req.user.name} ${outcome} ${request.requester}'s file access request for ${request.patientId}.`,
+    patientId: request.patientId,
+    requestId: request.id,
+    link: '/records',
+    actor: req.user.name
+  });
+  notifyHospitals({
     type: 'file_decision',
     title: `File access ${outcome}`,
     body: `${req.user.name} ${outcome} ${request.requester}'s file access request for ${request.patientId}.`,
@@ -704,7 +778,10 @@ app.get('/api/records', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), 
         return res.status(403).json({ error: 'This emergency unlock was requested by another clinician. Only the requesting clinician may use it.' });
       }
     } else if (!consentRegistry.hasActiveConsent({ patientId: requestedPatientId, requester: req.user })) {
-      return res.status(403).json({ error: `Patient consent required. No active consent for ${requestedPatientId} authorizing ${req.user.role}.` });
+      autoConsentIfAssigned(req.user, requestedPatientId);
+      if (!consentRegistry.hasActiveConsent({ patientId: requestedPatientId, requester: req.user })) {
+        return res.status(403).json({ error: `Patient consent required. No active consent for ${requestedPatientId} authorizing ${req.user.role}.` });
+      }
     }
   }
 
@@ -927,7 +1004,10 @@ app.get('/api/files', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (r
   }
 
   if (req.user.role !== 'Patient' && req.user.role !== 'Admin' && !consentRegistry.hasActiveConsent({ patientId: requestedPatientId, requester: req.user })) {
-    return res.status(403).json({ error: `Patient consent required. No active consent for ${requestedPatientId} authorizing ${req.user.role}.` });
+    autoConsentIfAssigned(req.user, requestedPatientId);
+    if (!consentRegistry.hasActiveConsent({ patientId: requestedPatientId, requester: req.user })) {
+      return res.status(403).json({ error: `Patient consent required. No active consent for ${requestedPatientId} authorizing ${req.user.role}.` });
+    }
   }
 
   listFilesForPatient(db, requestedPatientId).then(rows => {

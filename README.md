@@ -144,6 +144,8 @@ Each of the 22 seeded doctors (phone `+155510010001` … `+155510010022`, passwo
 
 > **Consent demo:** Log in as a patient (e.g. `+15552100001` / `patientpass`) → **Records** page. Grant or revoke consent for any provider. A Laboratory user (`+15550000006` / `labpass`) is **blocked** from reading a patient until the patient grants consent — try it.
 >
+> **Care-team access demo:** open a patient whose assigned doctor you are (the patient list now shows `doctor` and `department`) — records and files open immediately with no request. Any other clinician gets 403 and can use **Request file access**, which notifies the **patient, admin and hospital** in-app and by SMS; approval grants scoped consent.
+>
 > **File-access request demo (patient-controlled):**
 > 1. Login as a doctor (`+15550000001` / `doctorpass`) → **Records** → pick a patient you have no consent for → try to read (403).
 > 2. Click **Request file access**, enter a reason and submit. Both the **patient** and the **admin** are notified in-app (inbox / Notifications page) and by SMS (or `server/notifications/` locally).

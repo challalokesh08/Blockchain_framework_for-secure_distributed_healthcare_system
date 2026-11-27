@@ -274,7 +274,7 @@ export default function StaffRecordsScreen() {
     );
   };
 
-  const AccessSection = ({ pid }) => {
+  const AccessSection = ({ pid, assigned }) => {
     const latest = accessRequests
       .filter(r => r.patientId === pid)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
@@ -293,7 +293,9 @@ export default function StaffRecordsScreen() {
         ) : (
           <Text style={s.muted}>No file access requests for this patient yet.</Text>
         )}
-        {accessError ? (
+        {assigned ? (
+          <Text style={s.good}>Assigned care team — direct access. No permission request needed.</Text>
+        ) : accessError ? (
           <>
             <TextInput
               style={s.input}
@@ -310,6 +312,13 @@ export default function StaffRecordsScreen() {
       </View>
     );
   };
+
+  const assignedToMe = !!selected && (
+    user?.role === 'Admin' ||
+    ((user?.role === 'Doctor' || user?.role === 'Nurse') && selected.doctor === user.name) ||
+    (user?.role === 'Hospital' && !!selected.hospital &&
+      selected.hospital.toLowerCase() === String(user.organization || user.name).toLowerCase())
+  );
 
   const filtered = patients.filter(p =>
     `${p.patientId} ${p.name} ${p.phone}`.toLowerCase().includes(filter.toLowerCase())
@@ -333,7 +342,7 @@ export default function StaffRecordsScreen() {
           <>
             <EmergencySection pid={selected.patientId} />
             <VitalCard />
-            <AccessSection pid={selected.patientId} />
+            <AccessSection pid={selected.patientId} assigned={assignedToMe} />
             {accessError ? (
               <>
                 <Text style={s.accessError}>{accessError}</Text>

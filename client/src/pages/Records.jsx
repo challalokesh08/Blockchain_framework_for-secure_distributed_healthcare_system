@@ -300,6 +300,12 @@ function Records() {
   const pendingAccessRequests = accessRequests.filter(r => r.status === 'PENDING');
   const pendingPatientAccessRequests = pendingAccessRequests.filter(r => r.patientId === user?.patientId);
   const selectedAccessRequests = accessRequests.filter(r => r.patientId === selectedPatientId);
+  const assignedToMe = !!selectedPatient && (
+    user?.role === 'Admin' ||
+    ((user?.role === 'Doctor' || user?.role === 'Nurse') && selectedPatient.doctor === user.name) ||
+    (user?.role === 'Hospital' && !!selectedPatient.hospital &&
+      selectedPatient.hospital.toLowerCase() === String(user.organization || user.name).toLowerCase())
+  );
 
   const pendingRequest = emergencyRequests.find(r => r.patientId === selectedPatientId && r.status === 'PENDING');
   const activeUnlock = emergencyRequests.find(r =>
@@ -375,7 +381,12 @@ function Records() {
                 ))}
               </div>
               {accessMessage && <p className="consent-warning">{accessMessage}</p>}
-              {isStaff && selectedPatientId && (
+              {assignedToMe && (
+                <p className="consent-purpose">
+                  Assigned care team — you have direct access to this patient's records and files. No permission request needed.
+                </p>
+              )}
+              {isStaff && selectedPatientId && !assignedToMe && (
                 <div className="consent-panel" style={{ marginTop: '1.5rem' }}>
                   <h4>Request file access</h4>
                   <p className="consent-purpose">
