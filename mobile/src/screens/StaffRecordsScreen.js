@@ -323,6 +323,7 @@ export default function StaffRecordsScreen() {
   const filtered = patients.filter(p =>
     `${p.patientId} ${p.name} ${p.phone}`.toLowerCase().includes(filter.toLowerCase())
   );
+  const myPatients = patients.filter(p => p.assignedToYou);
 
   if (selected) {
     const items = [
@@ -392,6 +393,28 @@ export default function StaffRecordsScreen() {
     <View style={s.container}>
       <Text style={s.title}>All Patients</Text>
       <Text style={s.sub}>Logged in as: {user?.name} ({user?.role})</Text>
+      {user?.role !== 'Admin' && (
+        <View style={{ marginBottom: 12 }}>
+          <Text style={s.sectHead}>My patients ({myPatients.length})</Text>
+          {myPatients.length === 0 ? <Text style={s.hint}>No patients assigned to you yet.</Text> : (
+            <FlatList
+              data={myPatients}
+              keyExtractor={p => `my-${p.patientId}`}
+              style={{ maxHeight: 210 }}
+              renderItem={({ item }) => (
+                <View style={[s.card, { borderColor: '#2fbf9f' }]}>
+                  <View style={s.head}><Text style={s.author}>{item.name}</Text><Text style={s.date}>{item.patientId}</Text></View>
+                  <Text style={s.text}>{item.department || '—'} · Dr: {item.doctor || '—'}</Text>
+                  {item.diagnosis ? <Text style={s.text}>Condition: {item.diagnosis}</Text> : null}
+                  {item.summary ? <Text style={s.muted}>{item.summary}</Text> : null}
+                  <Text style={s.text}>Phone: {item.phone || '—'}</Text>
+                  <Button title="View Records" color="#2fbf9f" onPress={() => selectPatient(item)} />
+                </View>
+              )}
+            />
+          )}
+        </View>
+      )}
       <TextInput
         style={s.input}
         placeholder="Search name, ID or phone..."

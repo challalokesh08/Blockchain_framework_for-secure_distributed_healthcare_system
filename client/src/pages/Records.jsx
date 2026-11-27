@@ -256,6 +256,7 @@ function Records() {
   );
 
   const selectedPatient = patients.find(p => p.patientId === selectedPatientId);
+  const myPatients = patients.filter(p => p.assignedToYou);
 
   const requestEmergency = async (event) => {
     event.preventDefault();
@@ -364,6 +365,22 @@ function Records() {
                     </form>
                   )}
                 </>
+              )}
+              {isStaff && user?.role !== 'Admin' && (
+                <div className="consent-panel" style={{ marginTop: '1rem' }}>
+                  <h4>My patients ({myPatients.length})</h4>
+                  {myPatients.length === 0 ? <p className="consent-purpose">No patients are assigned to you yet.</p> : myPatients.map(p => (
+                    <div key={p.patientId} className="consent-row">
+                      <div>
+                        <strong>{p.name}</strong> · <span className="patient-row-id">{p.patientId}</span>
+                        <p className="consent-purpose">{p.department} · Assigned doctor: {p.doctor}</p>
+                        {p.diagnosis ? <p className="consent-purpose">Condition: {p.diagnosis}</p> : null}
+                        {p.summary ? <p className="consent-purpose">{p.summary}</p> : null}
+                      </div>
+                      <button type="button" className="button secondary" onClick={() => loadPatientData(p.patientId)}>Open</button>
+                    </div>
+                  ))}
+                </div>
               )}
               <div className="patient-list">
                 {filteredPatients.length === 0 && <p>No patients found.</p>}

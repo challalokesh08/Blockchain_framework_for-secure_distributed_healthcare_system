@@ -45,6 +45,8 @@ const { AccessRequestRegistry } = require('./access-requests');
 const { NotificationRegistry } = require('./notification-registry');
 const { deriveVitals } = require('./vitals');
 const { listDoctors, listDepartments, findDoctor } = require('./doctors');
+const dataset = require('../dataset');
+const DATASET_BY_PATIENT = new Map(dataset.map(row => [row.patientId, row]));
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -110,12 +112,13 @@ function notifyHospitals(details) {
 // access instead of making them ask for permission.
 function patientAssignment(patientId) {
   const user = getUserByPatientId(patientId);
+  const row = DATASET_BY_PATIENT.get(patientId);
   const rec = ledger.getPatientRecords(patientId).find(r =>
     r.data && (r.data.physician || r.data.department || r.data.hospital)
   );
   return {
-    doctor: user?.assignedDoctor || rec?.data?.physician || null,
-    department: user?.department || rec?.data?.department || null,
+    doctor: user?.assignedDoctor || row?.doctor || rec?.data?.physician || null,
+    department: user?.department || row?.department || rec?.data?.department || null,
     hospital: rec?.data?.hospital || rec?.data?.lab || null
   };
 }
@@ -426,7 +429,39 @@ app.get('/api/ledger', authenticateToken, authorizeRoles(...STAFF_OR_PATIENT), (
 });
 
 app.get('/api/patients', authenticateToken, authorizeRoles(...STAFF_ROLES), (req, res) => {
-  const patients = getAllPatients().map(p => ({ ...p, ...patientAssignment(p.patientId) }));
+  // Patient details come from the committed dataset (same data as the GitHub
+  // repo), so every deployment shows the full clinical list even before the
+  // blockchain seed finishes. Account entries from SQLite are merged in.
+  const byId = new Map();
+  for (const user of getAllPatients()) byId.set(user.patientId, { ...user });
+  for (const row of dataset) byId.set(row.patientId, { ...(byId.get(row.patientId) || {}), ...row });
+
+  const diagnoses = new Map();
+  for (const block of ledger.chain) {
+    for (const tx of block.transactions) {
+      if (tx.patientId && tx.data?.diagnosis && !diagnoses.has(tx.patientId)) {
+        diagnoses.set(tx.patientId, tx.data.diagnosis);
+      }
+    }
+  }
+  const name = String(req.user.name || '').toLowerCase();
+  const patients = [...byId.values()].map(p => {
+    const assignment = patientAssignment(p.patientId);
+    const assignedToYou = req.user.role === 'Doctor' || req.user.role === 'Nurse'
+      ? !!assignment.doctor && assignment.doctor.toLowerCase() === name
+      : req.user.role === 'Hospital' && !!assignment.hospital &&
+        assignment.hospital.toLowerCase() === String(req.user.organization || req.user.name).toLowerCase();
+    return {
+      patientId: p.patientId,
+      name: p.name,
+      phone: p.phone || null,
+      age: p.age ?? null,
+      ...assignment,
+      assignedToYou,
+      diagnosis: p.diagnosis || diagnoses.get(p.patientId) || null,
+      summary: p.news || p.notes || null
+    };
+  }).sort((a, b) => (b.assignedToYou === a.assignedToYou ? a.patientId.localeCompare(b.patientId) : b.assignedToYou ? 1 : -1));
   res.json({ patients });
 });
 
