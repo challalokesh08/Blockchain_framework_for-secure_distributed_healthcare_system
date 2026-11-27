@@ -140,6 +140,7 @@ The `isChainValid()` function checks:
 - The department and assigned doctor are stored on the patient account and returned at login
 - Registering under a doctor grants that doctor scoped consent immediately and seals the `GRANT` transaction on-chain
 - Both platforms use the same directory, so a registration made on the phone is consistent with the website
+- **Profile** (navbar on web, Home button on mobile) shows name, role, patient ID, age, phone, department and assigned doctor from `GET /api/profile`; seeded patients inherit their care team from their clinical record
 
 ---
 
@@ -193,6 +194,7 @@ The `isChainValid()` function checks:
 | GET | /api/doctors | No | Departments and doctors grouped by department |
 | POST | /api/auth/register | No | Register patient with department + assignedDoctor |
 | POST | /api/auth/register-patient | Doctor/Admin | Add a new patient (staff-initiated) |
+| GET | /api/profile | Yes | Current user's profile incl. patient ID, department, assigned doctor |
 | GET | /api/status | No | Blockchain status |
 | GET | /api/ledger | Yes | Full blockchain ledger |
 | GET | /api/records?patientId=X | Yes | Get patient records |

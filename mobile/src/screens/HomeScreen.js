@@ -60,6 +60,9 @@ export default function HomeScreen({ navigation }) {
           {user?.role !== 'Patient' && <View style={{ marginTop: 8 }}><Btn title="View Patient Records" color="#e2b95f" onPress={() => navigation.navigate('StaffRecords')} /></View>}
           {user?.role !== 'Patient' && <View style={{ marginTop: 8 }}><Btn title="Upload File" color="#58d9a6" onPress={() => navigation.navigate('Upload')} /></View>}
           <View style={{ marginTop: 8 }}>
+            <Btn title="My Profile" color="#58d9a6" onPress={() => navigation.navigate('Profile')} />
+          </View>
+          <View style={{ marginTop: 8 }}>
             <Btn title={unread ? `Notifications (${unread} new)` : 'Notifications'} color="#8ab4ff" onPress={() => navigation.navigate('Notifications')} />
           </View>
           <View style={{ marginTop: 8 }}>

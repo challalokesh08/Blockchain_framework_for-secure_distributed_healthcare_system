@@ -209,6 +209,32 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ token, user: publicPayload });
 });
 
+// Current user's profile, including care assignment stored at registration.
+app.get('/api/profile', authenticateToken, (req, res) => {
+  const stored = findUser(req.user.username) || {};
+  const profile = {
+    username: req.user.username,
+    role: req.user.role,
+    name: stored.name || req.user.name,
+    patientId: stored.patientId || req.user.patientId || null,
+    phone: stored.phone || req.user.phone || null,
+    age: stored.age ?? null,
+    department: stored.department || null,
+    assignedDoctor: stored.assignedDoctor || null,
+    organization: stored.organization || null
+  };
+  // Seeded patients predate the registration form — derive their care team
+  // from their clinical record so the profile is still useful.
+  if (profile.patientId && (!profile.department || !profile.assignedDoctor)) {
+    const rec = ledger.getPatientRecords(profile.patientId).find(r => r.data?.department || r.data?.physician);
+    if (rec) {
+      profile.department = profile.department || rec.data.department || null;
+      profile.assignedDoctor = profile.assignedDoctor || rec.data.physician || null;
+    }
+  }
+  res.json({ profile });
+});
+
 // Public doctor directory for registration (department -> doctors).
 app.get('/api/doctors', (req, res) => {
   const doctors = listDoctors().map(d => ({
