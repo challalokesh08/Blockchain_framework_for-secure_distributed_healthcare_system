@@ -25,7 +25,7 @@ function Navigator() {
       {isAuthenticated && (
         <>
           <Stack.Screen name="Records" component={RecordsScreen} options={{ title: 'My Records' }} />
-          {user?.role !== 'Patient' && <Stack.Screen name="StaffRecords" component={StaffRecordsScreen} options={{ title: 'Patient Records' }} />}
+          {user?.role !== 'Patient' && <Stack.Screen name="StaffRecords" component={StaffRecordsScreen} options={{ title: 'Patients' }} />}
           <Stack.Screen name="Upload" component={UploadScreen} options={{ title: 'Upload File' }} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ title: 'Notifications' }} />
           <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'My Profile' }} />

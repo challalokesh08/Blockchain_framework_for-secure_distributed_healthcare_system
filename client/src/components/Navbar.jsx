@@ -13,6 +13,7 @@ const publicLinks = [
 const authenticatedLinks = [
   { path: '/dashboard', label: 'Dashboard' },
   { path: '/profile', label: 'Profile' },
+  { path: '/patients', label: 'Patients' },
   { path: '/records', label: 'Records' },
   { path: '/contracts', label: 'Contracts' }
 ];

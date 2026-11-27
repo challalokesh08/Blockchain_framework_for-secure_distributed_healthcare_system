@@ -119,6 +119,7 @@ The `isChainValid()` function checks:
 - A clinician who lacks consent can **request file access** with a reason. The **patient, admin and hospital** are notified (in-app + SMS). The patient (or admin, for oversight) approves or rejects; approval grants scoped consent automatically so the clinician can open records/files, and the doctor's screen refreshes within ~10 seconds
 - The patient's **assigned clinician** (doctor/nurse) and hospital get direct access without a request: `/api/patients` exposes `doctor`, `department`, `hospital`, `diagnosis` and `summary`, plus an `assignedToYou` flag. Web and mobile show a **My patients** panel with those details so each doctor sees only their own cohort first
 - Patient details are taken from the committed `dataset.js` (the data in this GitHub repo) rather than relying on blockchain seeding, so the list is complete even on ephemeral deployments; account records from SQLite are merged in
+- A dedicated **Patients** page (web route `/patients`, mobile Home → Patients) separates **My patients** (full records/files) from **Other patients** (names/IDs only, locked until the patient or admin approves a file-access request). Requests and decisions poll every 10 s; admins can approve/reject on the same page
 - Every request and decision is written to the ledger (`FILE_ACCESS_REQUEST`, `FILE_ACCESS_APPROVED`, `FILE_ACCESS_REJECTED`)
 - Patients cannot decide requests belonging to other patients; emergency vitals may only be used by the clinician who requested the unlock
 
