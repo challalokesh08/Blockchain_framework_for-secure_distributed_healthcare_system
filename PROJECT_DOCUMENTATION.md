@@ -141,6 +141,7 @@ The `isChainValid()` function checks:
 - Registering under a doctor grants that doctor scoped consent immediately and seals the `GRANT` transaction on-chain
 - Both platforms use the same directory, so a registration made on the phone is consistent with the website
 - **Profile** (navbar on web, Home button on mobile) shows name, role, patient ID, age, phone, department and assigned doctor from `GET /api/profile`; seeded patients inherit their care team from their clinical record
+- **Restart-safe accounts:** registration returns a signed recovery token (JWT containing the already-hashed password and care assignment). Web/mobile store it; if the free backend loses its ephemeral registry on redeploy, the app calls `POST /api/auth/restore` to recreate the identical patient ID and consent instead of issuing a duplicate ID
 
 ---
 
@@ -193,6 +194,7 @@ The `isChainValid()` function checks:
 | POST | /api/auth/login | No | Login with phone + password |
 | GET | /api/doctors | No | Departments and doctors grouped by department |
 | POST | /api/auth/register | No | Register patient with department + assignedDoctor |
+| POST | /api/auth/restore | No | Restore patient account/ID from signed recovery token |
 | POST | /api/auth/register-patient | Doctor/Admin | Add a new patient (staff-initiated) |
 | GET | /api/profile | Yes | Current user's profile incl. patient ID, department, assigned doctor |
 | GET | /api/status | No | Blockchain status |

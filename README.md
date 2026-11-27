@@ -154,6 +154,8 @@ Each of the 22 seeded doctors (phone `+155510010001` … `+155510010022`, passwo
 >
 > **Profile demo:** open **Profile** (navbar on web, Home button on mobile) to see your name, role, age, phone, **patient ID**, **department**, and **assigned doctor**. Seeded patients get their care team from their clinical record automatically.
 >
+> **Restart-safe registration:** the free Render backend has an ephemeral disk, so its in-memory user registry resets on redeploy. Registration returns a signed **recovery token** that the web/mobile app stores; on the next launch, if the account is missing, the app calls `POST /api/auth/restore` and recreates the **same patient ID**, hashed password, department and doctor. New registrations still get the next unused ID (P-3006, P-3007, …).
+>
 > **PoA demo:** Admin can seal pending transactions into a block via `POST /api/mine`. Blocks show the sealed-by validator and signature.
 
 > **Break-glass (emergency access) demo:**
@@ -475,6 +477,7 @@ npm run docker-up
 | POST | `/api/auth/login` | No | Login with phone + password |
 | GET | `/api/doctors` | No | Departments + doctors grouped by department |
 | POST | `/api/auth/register` | No | Register patient (name, age, phone, password, department, assignedDoctor) |
+| POST | `/api/auth/restore` | No | Restore the same patient account/ID after a backend restart using the signed recovery token |
 | GET | `/api/profile` | Yes | Current user's profile (patient ID, department, assigned doctor) |
 | GET | `/api/status` | No | Blockchain status (consensus, validators, validity) |
 | GET | `/api/crypto/public-key` | No | Network RSA-2048 public key (key-wrapping) |

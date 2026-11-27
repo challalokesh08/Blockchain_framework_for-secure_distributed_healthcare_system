@@ -81,10 +81,12 @@ function nextPatientId() {
 function createPatientUser(details) {
   const nextId = users.filter(u => u.role === 'Patient').length + 2;
   const username = `patient${nextId}`;
-  const patientId = nextPatientId();
+  const patientId = (details.patientId && !users.some(u => u.patientId === details.patientId))
+    ? details.patientId
+    : nextPatientId();
   const user = {
     username,
-    password: bcrypt.hashSync(details.password, 10),
+    password: details.passwordHash || bcrypt.hashSync(details.password, 10),
     role: 'Patient',
     name: details.name,
     age: details.age,
@@ -177,6 +179,31 @@ function generateToken(user) {
   return jwt.sign({ username: user.username, role: user.role, name: user.name, patientId: user.patientId || null, phone: user.phone || null }, JWT_SECRET, { expiresIn: '8h' });
 }
 
+// A signed, self-contained copy of a registration. The client stores this so
+// it can restore the same account (and patient ID) if the backend restarts and
+// loses its ephemeral user registry. The password is already bcrypt-hashed.
+function generateRecoveryToken(user) {
+  return jwt.sign({
+    type: 'patient-recovery',
+    name: user.name,
+    age: user.age,
+    phone: user.phone,
+    patientId: user.patientId,
+    department: user.department || null,
+    assignedDoctor: user.assignedDoctor || null,
+    passwordHash: user.password
+  }, JWT_SECRET, { expiresIn: '365d' });
+}
+
+function verifyRecoveryToken(token) {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return payload.type === 'patient-recovery' ? payload : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
@@ -220,6 +247,8 @@ module.exports = {
   getUserByName,
   verifyPassword,
   generateToken,
+  generateRecoveryToken,
+  verifyRecoveryToken,
   authenticateToken,
   authorizeRoles,
   createPatientUser,

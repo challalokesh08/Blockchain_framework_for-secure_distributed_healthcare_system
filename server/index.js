@@ -5,7 +5,7 @@ const cors = require('cors');
 const jsonwebtoken = require('jsonwebtoken');
 const { Blockchain, PatientRecordTransaction, VALIDATORS, roleForValidator } = require('./blockchain');
 const { findUser, findUserByPhone, verifyPassword, generateToken, authenticateToken, authorizeRoles, createPatientUser, getAllPatients, seedPatient, seedDoctor, loadPersistedUsers, loadExtraSeedUsers, setDb, STAFF_ROLES } = require('./auth');
-const { getUserByPatientId, getUsersByRole, getUserByName } = require('./auth');
+const { getUserByPatientId, getUsersByRole, getUserByName, generateRecoveryToken, verifyRecoveryToken } = require('./auth');
 const { sendSMS } = require('./notifications');
 const multer = require('multer');
 const fs = require('fs');
@@ -211,7 +211,8 @@ app.post('/api/auth/login', (req, res) => {
 
 // Current user's profile, including care assignment stored at registration.
 app.get('/api/profile', authenticateToken, (req, res) => {
-  const stored = findUser(req.user.username) || {};
+  const stored = findUser(req.user.username);
+  if (!stored) return res.status(404).json({ error: 'Account not found on this server instance.' });
   const profile = {
     username: req.user.username,
     role: req.user.role,
@@ -285,7 +286,42 @@ app.post('/api/auth/register', (req, res) => {
   res.status(201).json({
     token,
     user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone, department, assignedDoctor: doctor.name },
+    recoveryToken: generateRecoveryToken(user),
     consent
+  });
+});
+
+// Restore a registered patient after the backend restarts and loses its
+// ephemeral user registry. Same ID, same hashed password, same care team.
+app.post('/api/auth/restore', (req, res) => {
+  const details = verifyRecoveryToken(req.body?.token);
+  if (!details) return res.status(400).json({ error: 'Invalid recovery token.' });
+
+  let user = findUserByPhone(details.phone);
+  let restored = false;
+  if (!user) {
+    user = createPatientUser({
+      name: details.name, age: details.age, phone: details.phone,
+      passwordHash: details.passwordHash, patientId: details.patientId,
+      department: details.department, assignedDoctor: details.assignedDoctor
+    });
+    if (details.assignedDoctor) {
+      const consent = consentRegistry.grant({
+        patientId: user.patientId, providerName: details.assignedDoctor,
+        providerType: 'Doctor', purpose: 'Primary care coordination (restored)',
+        requester: { name: 'Recovery' }
+      });
+      ledger.addTransaction({ patientId: user.patientId, author: user.name, data: { type: 'consent', action: 'GRANT', consentId: consent.consentId, providerName: details.assignedDoctor, restored: true } });
+    }
+    restored = true;
+  }
+
+  const token = generateToken(user);
+  res.json({
+    message: restored ? 'Account restored after server restart.' : 'Account already present.',
+    token,
+    user: { username: user.username, role: user.role, name: user.name, patientId: user.patientId, phone: user.phone, department: user.department || null, assignedDoctor: user.assignedDoctor || null },
+    recoveryToken: generateRecoveryToken(user)
   });
 });
 
