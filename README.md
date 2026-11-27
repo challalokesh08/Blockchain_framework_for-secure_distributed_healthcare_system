@@ -38,6 +38,8 @@ npm run dev
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:4000/api`
 
+> **Demo consistency:** the web app talks to the **same deployed Render backend as the phone app** by default, so an approval on one device is instantly visible on the other. To point the web dev server at a local `:4000` backend instead, run `VITE_USE_LOCAL_API=1 npm run dev` (not recommended for cross-device demos).
+
 ### Option 2: Deploy Frontend to GitHub Pages
 
 1. Go to **Settings > Pages** in your repo
@@ -388,7 +390,9 @@ npx expo start
 | Screen | Visible to | What it does |
 |--------|-----------|--------------|
 | **My Records** | All (Patient + Staff) | Shows the logged-in user's own records |
-| **View Patient Records** | All staff roles (Doctor / Nurse / Admin / Hospital / Laboratory / Insurance) | Search **any** patient ID and see their records + files |
+| **View Patient Records** | All staff roles (Doctor / Nurse / Admin / Hospital / Laboratory / Insurance) | Search **any** patient ID, request file access, see records + files, raise emergency unlocks |
+| **Notifications** | All logged-in users | Role-scoped inbox for file requests, decisions and emergency updates; tap to open the patient |
+| **File access requests** | Patient | Approve/reject a clinician's file request from the phone |
 | **Upload File** | Doctor / Nurse / Admin / Hospital / Laboratory | Upload a medical file for a patient |
 
 > All record and file reads are **consent-gated**: a staff member can only see a patient's data if that patient has granted them (or their organisation) consent — Insurance is read-only.

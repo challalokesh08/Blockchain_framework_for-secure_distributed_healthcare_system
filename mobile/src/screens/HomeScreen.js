@@ -6,10 +6,21 @@ import api from '../api';
 export default function HomeScreen({ navigation }) {
   const { user, logout, isAuthenticated } = useContext(AuthContext);
   const [status, setStatus] = useState(null);
+  const [unread, setUnread] = useState(0);
 
   useEffect(() => {
     api.get('/api/status').then(r => setStatus(r.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) { setUnread(0); return undefined; }
+    const refresh = () => api.get('/api/notifications')
+      .then(r => setUnread((r.data?.notifications || []).filter(n => !n.read).length))
+      .catch(() => {});
+    refresh();
+    const sub = navigation.addListener('focus', refresh);
+    return () => sub();
+  }, [isAuthenticated, navigation]);
 
   return (
     <View style={s.container}>
@@ -32,6 +43,9 @@ export default function HomeScreen({ navigation }) {
           <Btn title="My Records" color="#5b8ff9" onPress={() => navigation.navigate('Records')} />
           {user?.role !== 'Patient' && <View style={{ marginTop: 8 }}><Btn title="View Patient Records" color="#e2b95f" onPress={() => navigation.navigate('StaffRecords')} /></View>}
           {user?.role !== 'Patient' && <View style={{ marginTop: 8 }}><Btn title="Upload File" color="#58d9a6" onPress={() => navigation.navigate('Upload')} /></View>}
+          <View style={{ marginTop: 8 }}>
+            <Btn title={unread ? `Notifications (${unread} new)` : 'Notifications'} color="#8ab4ff" onPress={() => navigation.navigate('Notifications')} />
+          </View>
           <View style={{ marginTop: 16 }}><Btn title="Logout" color="#ff6b6b" onPress={() => logout()} /></View>
         </>
       ) : (

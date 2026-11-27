@@ -30,8 +30,8 @@ Blockchain_framework_for-secure_distributed_healthcare_system/
 │       ├── pages/          # Home, Features, Explorer, Records, Dashboard, Contracts, Login, Register, About
 │       ├── components/     # Navbar, Footer, UploadForm, ProtectedRoute, AuthStatus, Notifications
 │       └── AuthContext.jsx # Auth state management
-├── mobile/                 # Expo React Native mobile app
-│   └── src/screens/        # HomeScreen, LoginScreen, RegisterScreen, RecordsScreen, UploadScreen
+├── mobile/                 # Expo React Native mobile app (same Render backend as web)
+│   └── src/screens/        # Home, Login, Register, Records, StaffRecords, Upload, Notifications
 ├── docs/                   # Built frontend for GitHub Pages deployment
 ├── render.yaml             # Render cloud deployment config
 └── docker-compose.yml      # Docker deployment
