@@ -209,7 +209,7 @@ export default function Patients() {
               )}
             </div>
 
-            <div className="record-panel">
+            <div className="record-panel patients-detail-panel">
               {!selected ? (
                 <p className="consent-purpose">Select a patient to view their records.</p>
               ) : (

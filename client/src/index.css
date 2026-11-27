@@ -658,6 +658,13 @@ nav {
   align-items: start;
 }
 
+.patients-detail-panel {
+  position: sticky;
+  top: 150px;
+  max-height: calc(100vh - 170px);
+  overflow-y: auto;
+}
+
 .record-panel,
 .history-panel {
   padding: 2rem;
@@ -953,6 +960,12 @@ nav {
   .about-grid,
   .records-grid {
     grid-template-columns: 1fr;
+  }
+
+  .patients-detail-panel {
+    position: static;
+    max-height: none;
+    overflow: visible;
   }
 }
 
